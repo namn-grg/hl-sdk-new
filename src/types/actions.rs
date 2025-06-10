@@ -1,4 +1,4 @@
-use crate::hyperliquid_action;
+use crate::{hyperliquid_action, l1_action};
 use alloy::primitives::{Address, B256};
 use serde;
 
@@ -14,12 +14,7 @@ hyperliquid_action! {
         pub time: u64,
     }
     => "UsdSend(string hyperliquidChain,string destination,string amount,uint64 time)"
-}
-
-impl UsdSend {
-    fn chain_id(&self) -> Option<u64> {
-        Some(self.signature_chain_id)
-    }
+    => encode(hyperliquid_chain, destination, amount, time)
 }
 
 hyperliquid_action! {
@@ -32,6 +27,7 @@ hyperliquid_action! {
         pub time: u64,
     }
     => "Withdraw(string hyperliquidChain,string destination,string amount,uint64 time)"
+    => encode(hyperliquid_chain, destination, amount, time)
 }
 
 hyperliquid_action! {
@@ -45,6 +41,7 @@ hyperliquid_action! {
         pub time: u64,
     }
     => "SpotSend(string hyperliquidChain,string destination,string token,string amount,uint64 time)"
+    => encode(hyperliquid_chain, destination, token, amount, time)
 }
 
 hyperliquid_action! {
@@ -57,6 +54,7 @@ hyperliquid_action! {
         pub nonce: u64,
     }
     => "ApproveAgent(string hyperliquidChain,address agentAddress,string agentName,uint64 nonce)"
+    => encode(hyperliquid_chain, agent_address, agent_name, nonce)
 }
 
 hyperliquid_action! {
@@ -69,17 +67,19 @@ hyperliquid_action! {
         pub nonce: u64,
     }
     => "ApproveBuilderFee(string hyperliquidChain,string maxFeeRate,string builder,uint64 nonce)"
+    => encode(hyperliquid_chain, max_fee_rate, builder, nonce)
 }
 
-// L1 Actions (without HyperliquidTransaction: prefix)
+// L1 Actions (use Exchange domain)
 
-hyperliquid_action! {
+l1_action! {
     /// Agent connection action
     struct Agent {
         pub source: String,
         pub connection_id: B256,
     }
-    => "Agent(string source,bytes32 connectionId)", no_prefix
+    => "Agent(string source,bytes32 connectionId)"
+    => encode(source, connection_id)
 }
 
 // Exchange Actions (these don't need EIP-712 signing but are included for completeness)
@@ -189,6 +189,8 @@ pub struct BuilderInfo {
     // Placeholder - will be defined in common.rs
 }
 
+// The macros don't handle signature_chain_id, so we need to remove the duplicate trait impls
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -203,7 +205,28 @@ mod tests {
     
     #[test]
     fn test_agent_type_hash() {
+        // L1 actions don't use the HyperliquidTransaction: prefix
         let expected = keccak256("Agent(string source,bytes32 connectionId)");
         assert_eq!(Agent::type_hash(), expected);
+    }
+    
+    #[test]
+    fn test_agent_domain() {
+        let agent = Agent {
+            source: "a".to_string(),
+            connection_id: B256::default(),
+        };
+        
+        // L1 actions use the Exchange domain
+        let domain = agent.domain();
+        let expected_domain = alloy::sol_types::eip712_domain! {
+            name: "Exchange",
+            version: "1",
+            chain_id: 1337u64,
+            verifying_contract: alloy::primitives::address!("0000000000000000000000000000000000000000"),
+        };
+        
+        // Compare domain separators to verify they're the same
+        assert_eq!(domain.separator(), expected_domain.separator());
     }
 }

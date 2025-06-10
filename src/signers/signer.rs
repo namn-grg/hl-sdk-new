@@ -73,10 +73,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::{Agent, UsdSend, Withdraw, HyperliquidAction};
     use alloy::{
-        primitives::{address, b256, keccak256, B256, U256},
+        primitives::b256,
         signers::local::PrivateKeySigner,
-        sol_types::{eip712_domain, Eip712Domain},
     };
 
     fn get_test_signer() -> AlloySigner<PrivateKeySigner> {
@@ -85,84 +85,43 @@ mod tests {
         AlloySigner { inner: signer }
     }
 
-    // L1 actions use "Exchange" domain with chain ID 1337
-    fn l1_domain() -> Eip712Domain {
-        eip712_domain! {
-            name: "Exchange",
-            version: "1",
-            chain_id: 1337u64,
-            verifying_contract: address!("0000000000000000000000000000000000000000"),
-        }
-    }
-
-    // User actions use "HyperliquidSignTransaction" domain
-    fn user_action_domain(chain_id: u64) -> Eip712Domain {
-        eip712_domain! {
-            name: "HyperliquidSignTransaction",
-            version: "1",
-            chain_id: chain_id,
-            verifying_contract: address!("0000000000000000000000000000000000000000"),
-        }
-    }
-
-    // Helper to compute EIP-712 hash
-    fn compute_eip712_hash(domain_separator: B256, struct_hash: B256) -> B256 {
-        let mut buf = Vec::with_capacity(66);
-        buf.push(0x19);
-        buf.push(0x01);
-        buf.extend_from_slice(&domain_separator[..]);
-        buf.extend_from_slice(&struct_hash[..]);
-        keccak256(&buf)
-    }
-
     #[tokio::test]
     async fn test_sign_l1_action() -> Result<(), Box<dyn std::error::Error>> {
         let signer = get_test_signer();
         let connection_id = b256!("de6c4037798a4434ca03cd05f00e3b803126221375cd1e7eaaaf041768be06eb");
         
-        // Debug: Print signer address
-        println!("Signer address: {:?}", signer.address());
+        // Create Agent action
+        let agent = Agent {
+            source: "a".to_string(),
+            connection_id,
+        };
         
-        // Agent type hash - Note: No "HyperliquidTransaction:" prefix for L1 actions!
-        let agent_type = "Agent(string source,bytes32 connectionId)";
-        println!("Agent type string: {}", agent_type);
-        let agent_type_hash = keccak256(agent_type.as_bytes());
-        println!("Agent type hash: {:?}", agent_type_hash);
+        // L1 actions use the Exchange domain with chain ID 1337 - provided by l1_action! macro
+        let domain = agent.domain();
         
-        // Use L1 domain (Exchange with chain ID 1337)
-        let domain = l1_domain();
-        println!("Domain: {:?}", domain);
-        let domain_separator = domain.separator();
-        println!("Domain separator: {:?}", domain_separator);
-        
-        // Test mainnet
-        println!("\nEncoding mainnet agent:");
-        let source_a_hash = keccak256("a".as_bytes());
-        println!("Source 'a' hash: {:?}", source_a_hash);
-        
-        let mut encoded = Vec::new();
-        encoded.extend_from_slice(&agent_type_hash[..]);
-        encoded.extend_from_slice(&source_a_hash[..]);
-        encoded.extend_from_slice(&connection_id[..]);
-        
-        println!("Encoded struct data: {}", hex::encode(&encoded));
-        
-        let struct_hash = keccak256(&encoded);
-        println!("Struct hash: {:?}", struct_hash);
-        
-        let signing_hash = compute_eip712_hash(domain_separator, struct_hash);
-        println!("Final signing hash: {:?}", signing_hash);
+        // Use the action's eip712_signing_hash method which handles everything
+        let signing_hash = agent.eip712_signing_hash(&domain);
         
         let mainnet_sig = signer.sign_hash(signing_hash).await?;
         
         let expected_mainnet = "fa8a41f6a3fa728206df80801a83bcbfbab08649cd34d9c0bfba7c7b2f99340f53a00226604567b98a1492803190d65a201d6805e5831b7044f17fd530aec7841c";
         let actual = format!("{:064x}{:064x}{:02x}", mainnet_sig.r, mainnet_sig.s, mainnet_sig.v);
         
-        println!("Got signature: {}", actual);
-        println!("Expected:      {}", expected_mainnet);
+        assert_eq!(actual, expected_mainnet);
         
-        // Don't assert yet, let's see the values
-        // assert_eq!(actual, expected_mainnet);
+        // Test testnet signature with source "b"
+        let agent_testnet = Agent {
+            source: "b".to_string(),
+            connection_id,
+        };
+        
+        let testnet_hash = agent_testnet.eip712_signing_hash(&agent_testnet.domain());
+        let testnet_sig = signer.sign_hash(testnet_hash).await?;
+        
+        let expected_testnet = "1713c0fc661b792a50e8ffdd59b637b1ed172d9a3aa4d801d9d88646710fb74b33959f4d075a7ccbec9f2374a6da21ffa4448d58d0413a0d335775f680a881431c";
+        let actual_testnet = format!("{:064x}{:064x}{:02x}", testnet_sig.r, testnet_sig.s, testnet_sig.v);
+        
+        assert_eq!(actual_testnet, expected_testnet);
         
         Ok(())
     }
@@ -171,53 +130,25 @@ mod tests {
     async fn test_sign_usd_transfer_action() -> Result<(), Box<dyn std::error::Error>> {
         let signer = get_test_signer();
         
-        // UsdSend uses the HyperliquidTransaction: prefix
-        let usd_send_type = "HyperliquidTransaction:UsdSend(string hyperliquidChain,string destination,string amount,uint64 time)";
-        println!("\nUsdSend type string: {}", usd_send_type);
-        let usd_send_type_hash = keccak256(usd_send_type.as_bytes());
-        println!("UsdSend type hash: {:?}", usd_send_type_hash);
+        // Create UsdSend action
+        let usd_send = UsdSend {
+            signature_chain_id: 421614,
+            hyperliquid_chain: "Testnet".to_string(),
+            destination: "0x0D1d9635D0640821d15e323ac8AdADfA9c111414".to_string(),
+            amount: "1".to_string(),
+            time: 1690393044548,
+        };
         
-        // Use user action domain with testnet chain ID
-        let domain = user_action_domain(421614);
-        println!("Domain: {:?}", domain);
-        let domain_separator = domain.separator();
-        println!("Domain separator: {:?}", domain_separator);
+        // Use the action's own domain method which uses signature_chain_id
+        let domain = usd_send.domain();
         
-        // Encode UsdSend struct
-        let mut encoded = Vec::new();
-        encoded.extend_from_slice(&usd_send_type_hash[..]);
-        
-        let hyperliquid_chain_hash = keccak256("Testnet".as_bytes());
-        println!("hyperliquidChain 'Testnet' hash: {:?}", hyperliquid_chain_hash);
-        encoded.extend_from_slice(&hyperliquid_chain_hash[..]);
-        
-        let destination_hash = keccak256("0x0D1d9635D0640821d15e323ac8AdADfA9c111414".as_bytes());
-        println!("destination hash: {:?}", destination_hash);
-        encoded.extend_from_slice(&destination_hash[..]);
-        
-        let amount_hash = keccak256("1".as_bytes());
-        println!("amount '1' hash: {:?}", amount_hash);
-        encoded.extend_from_slice(&amount_hash[..]);
-        
-        let time_bytes = U256::from(1690393044548u64).to_be_bytes::<32>();
-        println!("time bytes: {:?}", hex::encode(&time_bytes));
-        encoded.extend_from_slice(&time_bytes[..]);
-        
-        println!("Encoded struct data: {}", hex::encode(&encoded));
-        
-        let struct_hash = keccak256(&encoded);
-        println!("Struct hash: {:?}", struct_hash);
-        
-        let signing_hash = compute_eip712_hash(domain_separator, struct_hash);
-        println!("Final signing hash: {:?}", signing_hash);
+        // Use the action's eip712_signing_hash method
+        let signing_hash = usd_send.eip712_signing_hash(&domain);
         
         let sig = signer.sign_hash(signing_hash).await?;
         
         let expected = "214d507bbdaebba52fa60928f904a8b2df73673e3baba6133d66fe846c7ef70451e82453a6d8db124e7ed6e60fa00d4b7c46e4d96cb2bd61fd81b6e8953cc9d21b";
         let actual = format!("{:064x}{:064x}{:02x}", sig.r, sig.s, sig.v);
-        
-        println!("Got signature: {}", actual);
-        println!("Expected:      {}", expected);
         
         assert_eq!(actual, expected);
         
@@ -228,23 +159,20 @@ mod tests {
     async fn test_sign_withdraw_action() -> Result<(), Box<dyn std::error::Error>> {
         let signer = get_test_signer();
         
-        // The ethers-rs code shows Withdraw3 uses "Withdraw" not "Withdraw3" in the type string
-        let withdraw_type = "HyperliquidTransaction:Withdraw(string hyperliquidChain,string destination,string amount,uint64 time)";
-        let withdraw_type_hash = keccak256(withdraw_type.as_bytes());
+        // Create Withdraw action
+        let withdraw = Withdraw {
+            signature_chain_id: 421614,
+            hyperliquid_chain: "Testnet".to_string(),
+            destination: "0x0D1d9635D0640821d15e323ac8AdADfA9c111414".to_string(),
+            amount: "1".to_string(),
+            time: 1690393044548,
+        };
         
-        let domain = user_action_domain(421614);
-        let domain_separator = domain.separator();
+        // Use the action's own domain method which uses signature_chain_id
+        let domain = withdraw.domain();
         
-        // Encode Withdraw struct
-        let mut encoded = Vec::new();
-        encoded.extend_from_slice(&withdraw_type_hash[..]);
-        encoded.extend_from_slice(&keccak256("Testnet".as_bytes())[..]);
-        encoded.extend_from_slice(&keccak256("0x0D1d9635D0640821d15e323ac8AdADfA9c111414".as_bytes())[..]);
-        encoded.extend_from_slice(&keccak256("1".as_bytes())[..]);
-        encoded.extend_from_slice(&U256::from(1690393044548u64).to_be_bytes::<32>()[..]);
-        
-        let struct_hash = keccak256(&encoded);
-        let signing_hash = compute_eip712_hash(domain_separator, struct_hash);
+        // Use the action's eip712_signing_hash method
+        let signing_hash = withdraw.eip712_signing_hash(&domain);
         
         let sig = signer.sign_hash(signing_hash).await?;
         

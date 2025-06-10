@@ -1,4 +1,4 @@
-use alloy::primitives::{keccak256, B256, U256};
+use alloy::primitives::{keccak256, B256, U256, Address};
 use alloy::sol_types::Eip712Domain;
 
 pub trait HyperliquidAction: Sized + serde::Serialize {
@@ -8,7 +8,8 @@ pub trait HyperliquidAction: Sized + serde::Serialize {
     /// Whether this uses the HyperliquidTransaction: prefix
     const USE_PREFIX: bool = true;
     
-    /// Get chain ID for domain construction (if applicable)
+    /// Get chain ID for domain construction
+    /// Override this method for actions with signature_chain_id
     fn chain_id(&self) -> Option<u64> {
         None
     }
@@ -33,23 +34,14 @@ pub trait HyperliquidAction: Sized + serde::Serialize {
         keccak256(type_string.as_bytes())
     }
     
+    /// Encode the struct data according to EIP-712 rules
+    /// Default implementation - should be overridden for proper field ordering
     fn encode_data(&self) -> Vec<u8> {
-        // Generic encoding using the struct's fields
+        // This is a placeholder - each action should implement proper encoding
+        // based on its TYPE_STRING field order
         let mut encoded = Vec::new();
         encoded.extend_from_slice(&Self::type_hash()[..]);
-        
-        // Use serde to get field values, then encode each
-        let mut json = serde_json::to_value(self).unwrap();
-        if let serde_json::Value::Object(ref mut map) = json {
-            // Remove signature_chain_id from encoding - it's only for domain
-            map.remove("signatureChainId");
-            
-            // Note: This is a simplified version - in practice, you'd need to
-            // ensure fields are encoded in the correct order as specified in TYPE_STRING
-            for (_, value) in map {
-                encoded.extend_from_slice(&encode_field(&value)[..]);
-            }
-        }
+        // Subclasses should implement the rest
         encoded
     }
     
@@ -67,16 +59,47 @@ pub trait HyperliquidAction: Sized + serde::Serialize {
     }
 }
 
-fn encode_field(value: &serde_json::Value) -> [u8; 32] {
-    match value {
-        serde_json::Value::String(s) => keccak256(s.as_bytes()).into(),
-        serde_json::Value::Number(n) => {
-            if let Some(u) = n.as_u64() {
-                U256::from(u).to_be_bytes::<32>()
-            } else {
-                [0u8; 32]
-            }
+/// Encode a value according to EIP-712 rules
+pub fn encode_value<T: EncodeEip712>(value: &T) -> [u8; 32] {
+    value.encode_eip712()
+}
+
+/// Trait for types that can be encoded in EIP-712
+pub trait EncodeEip712 {
+    fn encode_eip712(&self) -> [u8; 32];
+}
+
+impl EncodeEip712 for String {
+    fn encode_eip712(&self) -> [u8; 32] {
+        keccak256(self.as_bytes()).into()
+    }
+}
+
+impl EncodeEip712 for u64 {
+    fn encode_eip712(&self) -> [u8; 32] {
+        U256::from(*self).to_be_bytes::<32>()
+    }
+}
+
+impl EncodeEip712 for B256 {
+    fn encode_eip712(&self) -> [u8; 32] {
+        (*self).into()
+    }
+}
+
+impl EncodeEip712 for Address {
+    fn encode_eip712(&self) -> [u8; 32] {
+        let mut result = [0u8; 32];
+        result[12..].copy_from_slice(self.as_slice());
+        result
+    }
+}
+
+impl<T: EncodeEip712> EncodeEip712 for Option<T> {
+    fn encode_eip712(&self) -> [u8; 32] {
+        match self {
+            Some(v) => v.encode_eip712(),
+            None => keccak256("".as_bytes()).into(), // Empty string hash for None
         }
-        _ => [0u8; 32],
     }
 }
