@@ -1,4 +1,5 @@
 use crate::{hyperliquid_action, l1_action};
+use crate::types::requests::{OrderRequest, CancelRequest, CancelRequestCloid, ModifyRequest, BuilderInfo};
 use alloy::primitives::{Address, B256};
 use serde;
 
@@ -156,38 +157,7 @@ pub struct BulkCancelCloid {
     pub cancels: Vec<CancelRequestCloid>,
 }
 
-// Supporting types (these will be defined in other files)
-// For now, creating placeholder types
-
-#[derive(Debug, Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OrderRequest {
-    // Placeholder - will be defined in requests.rs
-}
-
-#[derive(Debug, Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CancelRequest {
-    // Placeholder - will be defined in requests.rs
-}
-
-#[derive(Debug, Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ModifyRequest {
-    // Placeholder - will be defined in requests.rs
-}
-
-#[derive(Debug, Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CancelRequestCloid {
-    // Placeholder - will be defined in requests.rs
-}
-
-#[derive(Debug, Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BuilderInfo {
-    // Placeholder - will be defined in common.rs
-}
+// Types are now imported from requests.rs
 
 // The macros don't handle signature_chain_id, so we need to remove the duplicate trait impls
 
