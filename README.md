@@ -1,5 +1,3 @@
-![Ferrofluid](ferrofluid-background.png)
-
 # Ferrofluid
 
 ![Ferrofluid](ferrofluid-background.png)
