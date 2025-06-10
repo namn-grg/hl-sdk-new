@@ -1,6 +1,6 @@
 use crate::{hyperliquid_action, l1_action};
 use crate::types::requests::{OrderRequest, CancelRequest, CancelRequestCloid, ModifyRequest, BuilderInfo};
-use alloy::primitives::{Address, B256};
+use alloy::primitives::B256;
 use serde;
 
 // User Actions (with HyperliquidTransaction: prefix)
@@ -50,7 +50,7 @@ hyperliquid_action! {
     struct ApproveAgent {
         pub signature_chain_id: u64,
         pub hyperliquid_chain: String,
-        pub agent_address: Address,
+        pub agent_address: String,
         pub agent_name: Option<String>,
         pub nonce: u64,
     }
@@ -104,7 +104,7 @@ pub struct UpdateIsolatedMargin {
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultTransfer {
-    pub vault_address: Address,
+    pub vault_address: String,
     pub is_deposit: bool,
     pub usd: u64,
 }
@@ -118,7 +118,7 @@ pub struct SpotUser {
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClassTransfer {
-    pub usdc: u64,
+    pub usd_size: u64,
     pub to_perp: bool,
 }
 

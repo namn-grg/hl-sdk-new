@@ -6,7 +6,10 @@ pub enum HyperliquidError {
     RateLimited { available: u32, required: u32 },
     
     #[error("network error: {0}")]
-    Network(#[from] hyper::Error),
+    Network(String),
+    
+    #[error("hyper http error: {0}")]
+    HyperHttp(#[from] hyper::http::Error),
     
     #[error("json parsing error: {0}")]
     Json(#[from] simd_json::Error),
@@ -32,6 +35,12 @@ pub enum HyperliquidError {
     #[error("WebSocket error: {0}")]
     WebSocket(String),
     
+    #[error("Serialization error: {0}")]
+    Serialize(String),
+    
     #[error("unauthorized: {0}")]
     Unauthorized(String),
+    
+    #[error("invalid request: {0}")]
+    InvalidRequest(String),
 }

@@ -15,12 +15,15 @@ alloy = { version = "0.1", features = [ "full" ] }
 hyper = { version = "1", features = ["client", "http2"] }
 hyper-util = { version = "0.1", features = ["client", "http2"] }
 hyper-rustls = "0.27"  # TLS support
+http-body-util = "0.1"
 tower = { version = "0.4", features = ["timeout", "limit", "retry"] }
 http = "1"
 
 # WebSocket
 fastwebsockets = { version = "0.6", features = ["upgrade", "simd"] }
-rustls = "0.23"
+rustls = { version = "0.23", features = ["aws_lc_rs"] }
+rustls-native-certs = "0.7"
+tokio-rustls = "0.26"
 
 # JSON parsing
 simd-json = "0.13"
@@ -44,12 +47,15 @@ parking_lot = "0.12"
 url = "2.5"
 hex = "0.4"
 uuid = { version = "1.10", features = ["v4", "serde"] }
+rmp-serde = "1.1"
+rust_decimal = { version = "1.36", features = ["serde"] }
 
 [dev-dependencies]
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 criterion = { version = "0.5", features = ["html_reports"] }
 tokio-test = "0.4"
 hex = "0.4"
+reqwest = { version = "0.12", features = ["json"] }
 
 [profile.release]
 lto = "fat"

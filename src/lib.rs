@@ -8,3 +8,4 @@ pub mod utils;
 // Re-export commonly used items at crate root
 pub use constants::Network;
 pub use errors::HyperliquidError;
+pub use providers::{ExchangeProvider, InfoProvider};

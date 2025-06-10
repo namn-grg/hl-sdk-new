@@ -126,8 +126,8 @@ impl OrderRequest {
     }
 
     /// Set client order ID
-    pub fn with_cloid(mut self, cloid: Uuid) -> Self {
-        self.cloid = Some(format!("{:032x}", cloid.as_u128()));
+    pub fn with_cloid(mut self, cloid: Option<Uuid>) -> Self {
+        self.cloid = cloid.map(|id| format!("{:032x}", id.as_u128()));
         self
     }
 

@@ -5,6 +5,7 @@ pub mod symbols;
 pub mod requests;
 pub mod responses;
 pub mod info_types;
+pub mod ws;
 
 // Re-export commonly used types
 pub use actions::*;

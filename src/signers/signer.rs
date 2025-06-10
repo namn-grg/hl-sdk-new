@@ -35,7 +35,7 @@ pub enum SignerError {
 }
 
 pub struct AlloySigner<S: Signer> {
-    inner: S,
+    pub inner: S,
 }
 
 #[async_trait]
