@@ -28,11 +28,11 @@ macro_rules! hyperliquid_action {
         impl $crate::types::eip712::HyperliquidAction for $name {
             const TYPE_STRING: &'static str = $type_string;
             const USE_PREFIX: bool = true;
-            
+
             fn chain_id(&self) -> Option<u64> {
                 Some(self.signature_chain_id)
             }
-            
+
             fn encode_data(&self) -> Vec<u8> {
                 let mut encoded = Vec::new();
                 encoded.extend_from_slice(&Self::type_hash()[..]);
@@ -72,7 +72,7 @@ macro_rules! l1_action {
         impl $crate::types::eip712::HyperliquidAction for $name {
             const TYPE_STRING: &'static str = $type_string;
             const USE_PREFIX: bool = false;
-            
+
             // L1 actions use the Exchange domain with chain ID 1337
             fn domain(&self) -> alloy::sol_types::Eip712Domain {
                 alloy::sol_types::eip712_domain! {
@@ -82,7 +82,7 @@ macro_rules! l1_action {
                     verifying_contract: alloy::primitives::address!("0000000000000000000000000000000000000000"),
                 }
             }
-            
+
             fn encode_data(&self) -> Vec<u8> {
                 let mut encoded = Vec::new();
                 encoded.extend_from_slice(&Self::type_hash()[..]);

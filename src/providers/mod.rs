@@ -4,4 +4,4 @@ pub mod websocket;
 
 pub use exchange::{ExchangeProvider, OrderBuilder};
 pub use info::{InfoProvider, RateLimiter};
-pub use websocket::{WsProvider, SubscriptionId};
+pub use websocket::{SubscriptionId, WsProvider};

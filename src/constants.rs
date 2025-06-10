@@ -13,7 +13,7 @@ impl Network {
             Network::Testnet => "https://api.hyperliquid-testnet.xyz",
         }
     }
-    
+
     pub fn ws_url(&self) -> &'static str {
         match self {
             Network::Mainnet => "wss://api.hyperliquid.xyz/ws",
@@ -25,16 +25,17 @@ impl Network {
 // ==================== Chain Configuration ====================
 
 // Chain IDs
-pub const CHAIN_ID_MAINNET: u64 = 42161;   // Arbitrum One
-pub const CHAIN_ID_TESTNET: u64 = 421614;  // Arbitrum Sepolia
+pub const CHAIN_ID_MAINNET: u64 = 42161; // Arbitrum One
+pub const CHAIN_ID_TESTNET: u64 = 421614; // Arbitrum Sepolia
 
-// Agent Sources  
+// Agent Sources
 pub const AGENT_SOURCE_MAINNET: &str = "a";
 pub const AGENT_SOURCE_TESTNET: &str = "b";
 
 // Exchange Endpoints
 pub const EXCHANGE_ENDPOINT_MAINNET: &str = "https://api.hyperliquid.xyz/exchange";
-pub const EXCHANGE_ENDPOINT_TESTNET: &str = "https://api.hyperliquid-testnet.xyz/exchange";
+pub const EXCHANGE_ENDPOINT_TESTNET: &str =
+    "https://api.hyperliquid-testnet.xyz/exchange";
 
 // ==================== Rate Limit Weights ====================
 

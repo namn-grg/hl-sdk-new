@@ -1,19 +1,19 @@
-use alloy::primitives::{keccak256, B256, U256, Address};
+use alloy::primitives::{Address, B256, U256, keccak256};
 use alloy::sol_types::Eip712Domain;
 
 pub trait HyperliquidAction: Sized + serde::Serialize {
     /// The EIP-712 type string (without HyperliquidTransaction: prefix)
     const TYPE_STRING: &'static str;
-    
+
     /// Whether this uses the HyperliquidTransaction: prefix
     const USE_PREFIX: bool = true;
-    
+
     /// Get chain ID for domain construction
     /// Override this method for actions with signature_chain_id
     fn chain_id(&self) -> Option<u64> {
         None
     }
-    
+
     /// Get the EIP-712 domain for this action
     fn domain(&self) -> Eip712Domain {
         let chain_id = self.chain_id().unwrap_or(1); // Default to mainnet
@@ -24,7 +24,7 @@ pub trait HyperliquidAction: Sized + serde::Serialize {
             verifying_contract: alloy::primitives::address!("0000000000000000000000000000000000000000"),
         }
     }
-    
+
     fn type_hash() -> B256 {
         let type_string = if Self::USE_PREFIX {
             format!("HyperliquidTransaction:{}", Self::TYPE_STRING)
@@ -33,7 +33,7 @@ pub trait HyperliquidAction: Sized + serde::Serialize {
         };
         keccak256(type_string.as_bytes())
     }
-    
+
     /// Encode the struct data according to EIP-712 rules
     /// Default implementation - should be overridden for proper field ordering
     fn encode_data(&self) -> Vec<u8> {
@@ -44,11 +44,11 @@ pub trait HyperliquidAction: Sized + serde::Serialize {
         // Subclasses should implement the rest
         encoded
     }
-    
+
     fn struct_hash(&self) -> B256 {
         keccak256(&self.encode_data())
     }
-    
+
     fn eip712_signing_hash(&self, domain: &Eip712Domain) -> B256 {
         let mut buf = Vec::with_capacity(66);
         buf.push(0x19);

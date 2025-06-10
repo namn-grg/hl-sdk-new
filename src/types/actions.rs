@@ -1,7 +1,10 @@
-use crate::{hyperliquid_action, l1_action};
-use crate::types::requests::{OrderRequest, CancelRequest, CancelRequestCloid, ModifyRequest, BuilderInfo};
 use alloy::primitives::B256;
 use serde;
+
+use crate::types::requests::{
+    BuilderInfo, CancelRequest, CancelRequestCloid, ModifyRequest, OrderRequest,
+};
+use crate::{hyperliquid_action, l1_action};
 
 // User Actions (with HyperliquidTransaction: prefix)
 
@@ -163,30 +166,33 @@ pub struct BulkCancelCloid {
 
 #[cfg(test)]
 mod tests {
+    use alloy::primitives::keccak256;
+
     use super::*;
     use crate::types::eip712::HyperliquidAction;
-    use alloy::primitives::keccak256;
-    
+
     #[test]
     fn test_usd_send_type_hash() {
-        let expected = keccak256("HyperliquidTransaction:UsdSend(string hyperliquidChain,string destination,string amount,uint64 time)");
+        let expected = keccak256(
+            "HyperliquidTransaction:UsdSend(string hyperliquidChain,string destination,string amount,uint64 time)",
+        );
         assert_eq!(UsdSend::type_hash(), expected);
     }
-    
+
     #[test]
     fn test_agent_type_hash() {
         // L1 actions don't use the HyperliquidTransaction: prefix
         let expected = keccak256("Agent(string source,bytes32 connectionId)");
         assert_eq!(Agent::type_hash(), expected);
     }
-    
+
     #[test]
     fn test_agent_domain() {
         let agent = Agent {
             source: "a".to_string(),
             connection_id: B256::default(),
         };
-        
+
         // L1 actions use the Exchange domain
         let domain = agent.domain();
         let expected_domain = alloy::sol_types::eip712_domain! {
@@ -195,7 +201,7 @@ mod tests {
             chain_id: 1337u64,
             verifying_contract: alloy::primitives::address!("0000000000000000000000000000000000000000"),
         };
-        
+
         // Compare domain separators to verify they're the same
         assert_eq!(domain.separator(), expected_domain.separator());
     }

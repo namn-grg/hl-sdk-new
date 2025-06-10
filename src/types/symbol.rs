@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+
 use serde::{Deserialize, Serialize};
 
 /// A trading symbol that can be either a compile-time constant or runtime string
@@ -11,17 +12,17 @@ impl Symbol {
     pub const fn from_static(s: &'static str) -> Self {
         Symbol(Cow::Borrowed(s))
     }
-    
+
     /// Get the symbol as a string slice
     pub fn as_str(&self) -> &str {
         &self.0
     }
-    
+
     /// Check if this is a spot symbol (starts with @)
     pub fn is_spot(&self) -> bool {
         self.0.starts_with('@')
     }
-    
+
     /// Check if this is a perpetual symbol
     pub fn is_perp(&self) -> bool {
         !self.is_spot()
@@ -71,38 +72,38 @@ impl From<&Symbol> for Symbol {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_symbol_creation() {
         let static_sym = Symbol::from_static("BTC");
         assert_eq!(static_sym.as_str(), "BTC");
         assert!(static_sym.is_perp());
         assert!(!static_sym.is_spot());
-        
+
         let owned_sym = Symbol::from("ETH".to_string());
         assert_eq!(owned_sym.as_str(), "ETH");
-        
+
         let spot_sym = Symbol::from_static("@107");
         assert!(spot_sym.is_spot());
         assert!(!spot_sym.is_perp());
     }
-    
+
     #[test]
     fn test_symbol_conversions() {
         // From &'static str
         let sym: Symbol = "BTC".into();
         assert_eq!(sym.as_str(), "BTC");
-        
+
         // From String
         let sym: Symbol = String::from("ETH").into();
         assert_eq!(sym.as_str(), "ETH");
-        
+
         // From &String
         let s = String::from("SOL");
         let sym: Symbol = (&s).into();
         assert_eq!(sym.as_str(), "SOL");
     }
-    
+
     #[test]
     fn test_symbol_equality() {
         let sym1 = Symbol::from_static("BTC");

@@ -31,7 +31,7 @@ pub enum OrderType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Limit {
-    pub tif: String,  // "Alo", "Ioc", "Gtc"
+    pub tif: String, // "Alo", "Ioc", "Gtc"
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +41,7 @@ pub struct Trigger {
     pub trigger_px: String,
     #[serde(rename = "isMarket")]
     pub is_market: bool,
-    pub tpsl: String,  // "tp" or "sl"
+    pub tpsl: String, // "tp" or "sl"
 }
 
 // ==================== Cancel Types ====================

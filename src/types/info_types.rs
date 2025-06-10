@@ -370,7 +370,7 @@ pub struct TokenMeta {
     pub sz_decimals: u32,
     pub wei_decimals: u32,
     pub index: u32,
-    pub token_id: String,  // Actually a hex string, not Address
+    pub token_id: String, // Actually a hex string, not Address
     pub is_canonical: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub full_name: Option<String>,

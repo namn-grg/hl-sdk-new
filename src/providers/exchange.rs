@@ -1,26 +1,26 @@
-use crate::{
-    constants::*,
-    errors::HyperliquidError,
-    signers::{HyperliquidSigner, HyperliquidSignature},
-    types::{
-        actions::*,
-        eip712::HyperliquidAction,
-        requests::*,
-        responses::ExchangeResponseStatus,
-    },
-};
-use alloy::primitives::{Address, B256, keccak256};
-use hyper::{body::Bytes, Method, Request};
-use hyper_util::client::legacy::{Client, connect::HttpConnector};
-use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
-use http_body_util::{BodyExt, Full};
-use serde::Serialize;
-use serde_json::{json, Value};
 use std::{
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+use alloy::primitives::{Address, B256, keccak256};
+use http_body_util::{BodyExt, Full};
+use hyper::{Method, Request, body::Bytes};
+use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
+use hyper_util::client::legacy::{Client, connect::HttpConnector};
+use serde::Serialize;
+use serde_json::{Value, json};
 use uuid::Uuid;
+
+use crate::{
+    constants::*,
+    errors::HyperliquidError,
+    signers::{HyperliquidSignature, HyperliquidSigner},
+    types::{
+        actions::*, eip712::HyperliquidAction, requests::*,
+        responses::ExchangeResponseStatus,
+    },
+};
 
 type Result<T> = std::result::Result<T, HyperliquidError>;
 
@@ -36,7 +36,7 @@ pub struct ExchangeProvider<S: HyperliquidSigner> {
 
 impl<S: HyperliquidSigner> ExchangeProvider<S> {
     // ==================== Helper Methods ====================
-    
+
     fn infer_network(&self) -> (u64, &'static str) {
         if self.endpoint.contains("testnet") {
             (CHAIN_ID_TESTNET, AGENT_SOURCE_TESTNET)
@@ -44,34 +44,22 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             (CHAIN_ID_MAINNET, AGENT_SOURCE_MAINNET)
         }
     }
-    
+
     /// Get the configured builder address
     pub fn builder(&self) -> Option<Address> {
         self.builder
     }
-    
+
     // ==================== Constructors ====================
-    
+
     pub fn mainnet(signer: S) -> Self {
-        Self::new(
-            signer,
-            EXCHANGE_ENDPOINT_MAINNET,
-            None,
-            None,
-            None,
-        )
+        Self::new(signer, EXCHANGE_ENDPOINT_MAINNET, None, None, None)
     }
-    
+
     pub fn testnet(signer: S) -> Self {
-        Self::new(
-            signer,
-            EXCHANGE_ENDPOINT_TESTNET,
-            None,
-            None,
-            None,
-        )
+        Self::new(signer, EXCHANGE_ENDPOINT_TESTNET, None, None, None)
     }
-    
+
     pub fn mainnet_vault(signer: S, vault_address: Address) -> Self {
         Self::new(
             signer,
@@ -81,7 +69,7 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             None,
         )
     }
-    
+
     pub fn testnet_vault(signer: S, vault_address: Address) -> Self {
         Self::new(
             signer,
@@ -91,7 +79,7 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             None,
         )
     }
-    
+
     pub fn mainnet_agent(signer: S, agent_address: Address) -> Self {
         Self::new(
             signer,
@@ -101,7 +89,7 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             None,
         )
     }
-    
+
     pub fn testnet_agent(signer: S, agent_address: Address) -> Self {
         Self::new(
             signer,
@@ -111,7 +99,7 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             None,
         )
     }
-    
+
     // New builder-specific constructors
     pub fn mainnet_builder(signer: S, builder_address: Address) -> Self {
         Self::new(
@@ -122,7 +110,7 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             Some(builder_address),
         )
     }
-    
+
     pub fn testnet_builder(signer: S, builder_address: Address) -> Self {
         Self::new(
             signer,
@@ -132,28 +120,26 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             Some(builder_address),
         )
     }
-    
+
     // Combined constructors
-    pub fn mainnet_with_options(signer: S, vault: Option<Address>, agent: Option<Address>, builder: Option<Address>) -> Self {
-        Self::new(
-            signer,
-            EXCHANGE_ENDPOINT_MAINNET,
-            vault,
-            agent,
-            builder,
-        )
+    pub fn mainnet_with_options(
+        signer: S,
+        vault: Option<Address>,
+        agent: Option<Address>,
+        builder: Option<Address>,
+    ) -> Self {
+        Self::new(signer, EXCHANGE_ENDPOINT_MAINNET, vault, agent, builder)
     }
-    
-    pub fn testnet_with_options(signer: S, vault: Option<Address>, agent: Option<Address>, builder: Option<Address>) -> Self {
-        Self::new(
-            signer,
-            EXCHANGE_ENDPOINT_TESTNET,
-            vault,
-            agent,
-            builder,
-        )
+
+    pub fn testnet_with_options(
+        signer: S,
+        vault: Option<Address>,
+        agent: Option<Address>,
+        builder: Option<Address>,
+    ) -> Self {
+        Self::new(signer, EXCHANGE_ENDPOINT_TESTNET, vault, agent, builder)
     }
-    
+
     fn new(
         signer: S,
         endpoint: &'static str,
@@ -172,7 +158,7 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             RATE_LIMIT_MAX_TOKENS,
             RATE_LIMIT_REFILL_RATE,
         ));
-        
+
         Self {
             client,
             endpoint,
@@ -183,12 +169,15 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             builder,
         }
     }
-    
+
     // ==================== Direct Order Operations ====================
-    
-    pub async fn place_order(&self, order: &OrderRequest) -> Result<ExchangeResponseStatus> {
+
+    pub async fn place_order(
+        &self,
+        order: &OrderRequest,
+    ) -> Result<ExchangeResponseStatus> {
         self.rate_limiter.check_weight(WEIGHT_PLACE_ORDER)?;
-        
+
         let bulk_order = BulkOrder {
             orders: vec![order.clone()],
             grouping: "na".to_string(),
@@ -197,13 +186,17 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
                 fee: 0, // Default fee, use place_order_with_builder_fee to specify
             }),
         };
-        
+
         self.send_l1_action("order", &bulk_order).await
     }
-    
-    pub async fn place_order_with_builder_fee(&self, order: &OrderRequest, builder_fee: u64) -> Result<ExchangeResponseStatus> {
+
+    pub async fn place_order_with_builder_fee(
+        &self,
+        order: &OrderRequest,
+        builder_fee: u64,
+    ) -> Result<ExchangeResponseStatus> {
         self.rate_limiter.check_weight(WEIGHT_PLACE_ORDER)?;
-        
+
         let bulk_order = BulkOrder {
             orders: vec![order.clone()],
             grouping: "na".to_string(),
@@ -212,10 +205,10 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
                 fee: builder_fee,
             }),
         };
-        
+
         self.send_l1_action("order", &bulk_order).await
     }
-    
+
     pub async fn place_order_with_cloid(
         &self,
         mut order: OrderRequest,
@@ -224,42 +217,60 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
         order = order.with_cloid(Some(cloid));
         self.place_order(&order).await
     }
-    
-    pub async fn cancel_order(&self, asset: u32, oid: u64) -> Result<ExchangeResponseStatus> {
+
+    pub async fn cancel_order(
+        &self,
+        asset: u32,
+        oid: u64,
+    ) -> Result<ExchangeResponseStatus> {
         self.rate_limiter.check_weight(WEIGHT_CANCEL_ORDER)?;
-        
+
         let bulk_cancel = BulkCancel {
             cancels: vec![CancelRequest { asset, oid }],
         };
-        
+
         self.send_l1_action("cancel", &bulk_cancel).await
     }
-    
-    pub async fn cancel_order_by_cloid(&self, asset: u32, cloid: Uuid) -> Result<ExchangeResponseStatus> {
+
+    pub async fn cancel_order_by_cloid(
+        &self,
+        asset: u32,
+        cloid: Uuid,
+    ) -> Result<ExchangeResponseStatus> {
         self.rate_limiter.check_weight(WEIGHT_CANCEL_ORDER)?;
-        
+
         let bulk_cancel = BulkCancelCloid {
             cancels: vec![CancelRequestCloid::new(asset, cloid)],
         };
-        
+
         self.send_l1_action("cancelByCloid", &bulk_cancel).await
     }
-    
-    pub async fn modify_order(&self, oid: u64, new_order: OrderRequest) -> Result<ExchangeResponseStatus> {
+
+    pub async fn modify_order(
+        &self,
+        oid: u64,
+        new_order: OrderRequest,
+    ) -> Result<ExchangeResponseStatus> {
         self.rate_limiter.check_weight(WEIGHT_MODIFY_ORDER)?;
-        
+
         let bulk_modify = BulkModify {
-            modifies: vec![ModifyRequest { oid, order: new_order }],
+            modifies: vec![ModifyRequest {
+                oid,
+                order: new_order,
+            }],
         };
-        
+
         self.send_l1_action("batchModify", &bulk_modify).await
     }
-    
+
     // ==================== Bulk Operations ====================
-    
-    pub async fn bulk_orders(&self, orders: Vec<OrderRequest>) -> Result<ExchangeResponseStatus> {
+
+    pub async fn bulk_orders(
+        &self,
+        orders: Vec<OrderRequest>,
+    ) -> Result<ExchangeResponseStatus> {
         self.rate_limiter.check_weight(WEIGHT_BULK_ORDER)?;
-        
+
         let bulk_order = BulkOrder {
             orders,
             grouping: "na".to_string(),
@@ -268,13 +279,17 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
                 fee: 0, // Default fee, use bulk_orders_with_builder_fee to specify
             }),
         };
-        
+
         self.send_l1_action("order", &bulk_order).await
     }
-    
-    pub async fn bulk_orders_with_builder_fee(&self, orders: Vec<OrderRequest>, builder_fee: u64) -> Result<ExchangeResponseStatus> {
+
+    pub async fn bulk_orders_with_builder_fee(
+        &self,
+        orders: Vec<OrderRequest>,
+        builder_fee: u64,
+    ) -> Result<ExchangeResponseStatus> {
         self.rate_limiter.check_weight(WEIGHT_BULK_ORDER)?;
-        
+
         let bulk_order = BulkOrder {
             orders,
             grouping: "na".to_string(),
@@ -283,10 +298,10 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
                 fee: builder_fee,
             }),
         };
-        
+
         self.send_l1_action("order", &bulk_order).await
     }
-    
+
     pub async fn bulk_orders_with_cloids(
         &self,
         orders: Vec<(OrderRequest, Option<Uuid>)>,
@@ -295,54 +310,89 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             .into_iter()
             .map(|(order, cloid)| order.with_cloid(cloid))
             .collect();
-        
+
         self.bulk_orders(orders).await
     }
-    
-    pub async fn bulk_cancel(&self, cancels: Vec<CancelRequest>) -> Result<ExchangeResponseStatus> {
+
+    pub async fn bulk_cancel(
+        &self,
+        cancels: Vec<CancelRequest>,
+    ) -> Result<ExchangeResponseStatus> {
         self.rate_limiter.check_weight(WEIGHT_BULK_CANCEL)?;
-        
+
         let bulk_cancel = BulkCancel { cancels };
         self.send_l1_action("cancel", &bulk_cancel).await
     }
-    
-    pub async fn bulk_cancel_by_cloid(&self, cancels: Vec<CancelRequestCloid>) -> Result<ExchangeResponseStatus> {
+
+    pub async fn bulk_cancel_by_cloid(
+        &self,
+        cancels: Vec<CancelRequestCloid>,
+    ) -> Result<ExchangeResponseStatus> {
         self.rate_limiter.check_weight(WEIGHT_BULK_CANCEL)?;
-        
+
         let bulk_cancel = BulkCancelCloid { cancels };
         self.send_l1_action("cancelByCloid", &bulk_cancel).await
     }
-    
-    pub async fn bulk_modify(&self, modifies: Vec<ModifyRequest>) -> Result<ExchangeResponseStatus> {
+
+    pub async fn bulk_modify(
+        &self,
+        modifies: Vec<ModifyRequest>,
+    ) -> Result<ExchangeResponseStatus> {
         self.rate_limiter.check_weight(WEIGHT_BULK_ORDER)?;
-        
+
         let bulk_modify = BulkModify { modifies };
         self.send_l1_action("batchModify", &bulk_modify).await
     }
-    
+
     // ==================== Account Management ====================
-    
-    pub async fn update_leverage(&self, asset: u32, is_cross: bool, leverage: u32) -> Result<ExchangeResponseStatus> {
-        let update = UpdateLeverage { asset, is_cross, leverage };
+
+    pub async fn update_leverage(
+        &self,
+        asset: u32,
+        is_cross: bool,
+        leverage: u32,
+    ) -> Result<ExchangeResponseStatus> {
+        let update = UpdateLeverage {
+            asset,
+            is_cross,
+            leverage,
+        };
         self.send_l1_action("updateLeverage", &update).await
     }
-    
-    pub async fn update_isolated_margin(&self, asset: u32, is_buy: bool, ntli: i64) -> Result<ExchangeResponseStatus> {
-        let update = UpdateIsolatedMargin { asset, is_buy, ntli };
+
+    pub async fn update_isolated_margin(
+        &self,
+        asset: u32,
+        is_buy: bool,
+        ntli: i64,
+    ) -> Result<ExchangeResponseStatus> {
+        let update = UpdateIsolatedMargin {
+            asset,
+            is_buy,
+            ntli,
+        };
         self.send_l1_action("updateIsolatedMargin", &update).await
     }
-    
+
     pub async fn set_referrer(&self, code: String) -> Result<ExchangeResponseStatus> {
         let referrer = SetReferrer { code };
         self.send_l1_action("setReferrer", &referrer).await
     }
-    
+
     // ==================== User Actions (EIP-712) ====================
-    
-    pub async fn usd_transfer(&self, destination: Address, amount: &str) -> Result<ExchangeResponseStatus> {
+
+    pub async fn usd_transfer(
+        &self,
+        destination: Address,
+        amount: &str,
+    ) -> Result<ExchangeResponseStatus> {
         let (chain_id, _) = self.infer_network();
-        let chain = if chain_id == CHAIN_ID_MAINNET { "Mainnet" } else { "Testnet" };
-        
+        let chain = if chain_id == CHAIN_ID_MAINNET {
+            "Mainnet"
+        } else {
+            "Testnet"
+        };
+
         let action = UsdSend {
             signature_chain_id: chain_id,
             hyperliquid_chain: chain.to_string(),
@@ -350,14 +400,22 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             amount: amount.to_string(),
             time: Self::current_nonce(),
         };
-        
+
         self.send_user_action(&action).await
     }
-    
-    pub async fn withdraw(&self, destination: Address, amount: &str) -> Result<ExchangeResponseStatus> {
+
+    pub async fn withdraw(
+        &self,
+        destination: Address,
+        amount: &str,
+    ) -> Result<ExchangeResponseStatus> {
         let (chain_id, _) = self.infer_network();
-        let chain = if chain_id == CHAIN_ID_MAINNET { "Mainnet" } else { "Testnet" };
-        
+        let chain = if chain_id == CHAIN_ID_MAINNET {
+            "Mainnet"
+        } else {
+            "Testnet"
+        };
+
         let action = Withdraw {
             signature_chain_id: chain_id,
             hyperliquid_chain: chain.to_string(),
@@ -365,14 +423,23 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             amount: amount.to_string(),
             time: Self::current_nonce(),
         };
-        
+
         self.send_user_action(&action).await
     }
-    
-    pub async fn spot_transfer(&self, destination: Address, token: &str, amount: &str) -> Result<ExchangeResponseStatus> {
+
+    pub async fn spot_transfer(
+        &self,
+        destination: Address,
+        token: &str,
+        amount: &str,
+    ) -> Result<ExchangeResponseStatus> {
         let (chain_id, _) = self.infer_network();
-        let chain = if chain_id == CHAIN_ID_MAINNET { "Mainnet" } else { "Testnet" };
-        
+        let chain = if chain_id == CHAIN_ID_MAINNET {
+            "Mainnet"
+        } else {
+            "Testnet"
+        };
+
         let action = SpotSend {
             signature_chain_id: chain_id,
             hyperliquid_chain: chain.to_string(),
@@ -381,14 +448,22 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             amount: amount.to_string(),
             time: Self::current_nonce(),
         };
-        
+
         self.send_user_action(&action).await
     }
-    
-    pub async fn approve_agent(&self, agent_address: Address, agent_name: Option<String>) -> Result<ExchangeResponseStatus> {
+
+    pub async fn approve_agent(
+        &self,
+        agent_address: Address,
+        agent_name: Option<String>,
+    ) -> Result<ExchangeResponseStatus> {
         let (chain_id, _) = self.infer_network();
-        let chain = if chain_id == CHAIN_ID_MAINNET { "Mainnet" } else { "Testnet" };
-        
+        let chain = if chain_id == CHAIN_ID_MAINNET {
+            "Mainnet"
+        } else {
+            "Testnet"
+        };
+
         let action = ApproveAgent {
             signature_chain_id: chain_id,
             hyperliquid_chain: chain.to_string(),
@@ -396,14 +471,22 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             agent_name,
             nonce: Self::current_nonce(),
         };
-        
+
         self.send_user_action(&action).await
     }
-    
-    pub async fn approve_builder_fee(&self, builder: Address, max_fee_rate: String) -> Result<ExchangeResponseStatus> {
+
+    pub async fn approve_builder_fee(
+        &self,
+        builder: Address,
+        max_fee_rate: String,
+    ) -> Result<ExchangeResponseStatus> {
         let (chain_id, _) = self.infer_network();
-        let chain = if chain_id == CHAIN_ID_MAINNET { "Mainnet" } else { "Testnet" };
-        
+        let chain = if chain_id == CHAIN_ID_MAINNET {
+            "Mainnet"
+        } else {
+            "Testnet"
+        };
+
         let action = ApproveBuilderFee {
             signature_chain_id: chain_id,
             hyperliquid_chain: chain.to_string(),
@@ -411,46 +494,52 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             max_fee_rate,
             nonce: Self::current_nonce(),
         };
-        
+
         self.send_user_action(&action).await
     }
-    
+
     // ==================== Vault Operations ====================
-    
-    pub async fn vault_transfer(&self, vault_address: Address, is_deposit: bool, usd: u64) -> Result<ExchangeResponseStatus> {
+
+    pub async fn vault_transfer(
+        &self,
+        vault_address: Address,
+        is_deposit: bool,
+        usd: u64,
+    ) -> Result<ExchangeResponseStatus> {
         let transfer = VaultTransfer {
             vault_address: format!("0x{}", hex::encode(vault_address)),
             is_deposit,
             usd,
         };
-        
+
         self.send_l1_action("vaultTransfer", &transfer).await
     }
-    
+
     // ==================== Spot Operations ====================
-    
-    pub async fn spot_transfer_to_perp(&self, usd_size: u64, to_perp: bool) -> Result<ExchangeResponseStatus> {
-        let transfer = ClassTransfer {
-            usd_size,
-            to_perp,
-        };
-        
+
+    pub async fn spot_transfer_to_perp(
+        &self,
+        usd_size: u64,
+        to_perp: bool,
+    ) -> Result<ExchangeResponseStatus> {
+        let transfer = ClassTransfer { usd_size, to_perp };
+
         let spot_user = SpotUser {
             class_transfer: transfer,
         };
-        
+
         self.send_l1_action("spotUser", &spot_user).await
     }
-    
+
     // ==================== Helper Methods ====================
-    
+
     fn current_nonce() -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64
     }
-    
+
     fn hash_action<T: Serialize>(
         action_type: &str,
         action: &T,
@@ -462,11 +551,12 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
         if let Value::Object(ref mut map) = tagged_action {
             map.insert("type".to_string(), json!(action_type));
         }
-        
+
         // NOTE: Hyperliquid uses MessagePack (rmp_serde) for action serialization
         // This is different from typical EVM systems that use RLP
-        let mut bytes = rmp_serde::to_vec_named(&tagged_action)
-            .map_err(|e| HyperliquidError::InvalidRequest(format!("Failed to serialize action: {}", e)))?;
+        let mut bytes = rmp_serde::to_vec_named(&tagged_action).map_err(|e| {
+            HyperliquidError::InvalidRequest(format!("Failed to serialize action: {}", e))
+        })?;
         bytes.extend(timestamp.to_be_bytes());
         if let Some(vault) = vault_address {
             bytes.push(1);
@@ -476,33 +566,34 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
         }
         Ok(keccak256(bytes))
     }
-    
+
     async fn send_l1_action<T: Serialize>(
         &self,
         action_type: &str,
         action: &T,
     ) -> Result<ExchangeResponseStatus> {
         let nonce = Self::current_nonce();
-        let connection_id = Self::hash_action(action_type, action, nonce, self.vault_address)?;
-        
+        let connection_id =
+            Self::hash_action(action_type, action, nonce, self.vault_address)?;
+
         // Create Agent L1 action
         let (_, agent_source) = self.infer_network();
         let agent = Agent {
             source: agent_source.to_string(),
             connection_id,
         };
-        
+
         // Sign using EIP-712
         let domain = agent.domain();
         let signing_hash = agent.eip712_signing_hash(&domain);
         let signature = self.signer.sign_hash(signing_hash).await?;
-        
+
         // Build action value with type tag
         let mut action_value = serde_json::to_value(action)?;
         if let Value::Object(ref mut map) = action_value {
             map.insert("type".to_string(), json!(action_type));
         }
-        
+
         // Wrap action if using agent
         let final_action = if let Some(agent_address) = &self.agent {
             let (_, agent_source) = self.infer_network();
@@ -515,10 +606,10 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
         } else {
             action_value
         };
-        
+
         self.post(final_action, signature, nonce).await
     }
-    
+
     async fn send_user_action<T: HyperliquidAction + Serialize>(
         &self,
         action: &T,
@@ -526,14 +617,14 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
         let domain = action.domain();
         let signing_hash = action.eip712_signing_hash(&domain);
         let signature = self.signer.sign_hash(signing_hash).await?;
-        
+
         // Get action type from type name
         // This extracts "UsdSend" from "ferrofluid::types::actions::UsdSend"
         let action_type = std::any::type_name::<T>()
             .split("::")
             .last()
             .unwrap_or("Unknown");
-        
+
         // Get action value and extract nonce
         let mut action_value = serde_json::to_value(action)?;
         let nonce = action_value
@@ -541,30 +632,33 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             .or_else(|| action_value.get("nonce"))
             .and_then(|v| v.as_u64())
             .unwrap_or_else(Self::current_nonce);
-        
+
         // Add type tag
         if let Value::Object(ref mut map) = action_value {
             map.insert("type".to_string(), json!(action_type));
         }
-        
+
         self.post(action_value, signature, nonce).await
     }
-    
+
     async fn post(
         &self,
         action: Value,
         signature: HyperliquidSignature,
         nonce: u64,
     ) -> Result<ExchangeResponseStatus> {
-        let sig_hex = format!("{:064x}{:064x}{:02x}", signature.r, signature.s, signature.v);
-        
+        let sig_hex = format!(
+            "{:064x}{:064x}{:02x}",
+            signature.r, signature.s, signature.v
+        );
+
         let payload = json!({
             "action": action,
             "signature": sig_hex,
             "nonce": nonce,
             "vaultAddress": self.vault_address,
         });
-        
+
         let body = Full::new(Bytes::from(serde_json::to_vec(&payload)?));
         let request = Request::builder()
             .method(Method::POST)
@@ -572,14 +666,20 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
             .header("Content-Type", "application/json")
             .body(body)
             .map_err(|e| HyperliquidError::Network(e.to_string()))?;
-        
-        let response = self.client.request(request).await
+
+        let response = self
+            .client
+            .request(request)
+            .await
             .map_err(|e| HyperliquidError::Network(e.to_string()))?;
         let status = response.status();
-        let body_bytes = response.into_body().collect().await
+        let body_bytes = response
+            .into_body()
+            .collect()
+            .await
             .map_err(|e| HyperliquidError::Network(e.to_string()))?
             .to_bytes();
-        
+
         if !status.is_success() {
             let error_text = String::from_utf8_lossy(&body_bytes);
             return Err(HyperliquidError::Http {
@@ -587,7 +687,7 @@ impl<S: HyperliquidSigner> ExchangeProvider<S> {
                 body: error_text.to_string(),
             });
         }
-        
+
         serde_json::from_slice(&body_bytes).map_err(|e| {
             HyperliquidError::InvalidResponse(format!(
                 "Failed to parse exchange response: {}",
@@ -623,56 +723,57 @@ impl<'a, S: HyperliquidSigner> OrderBuilder<'a, S> {
             cloid: None,
         }
     }
-    
+
     pub fn buy(mut self) -> Self {
         self.is_buy = Some(true);
         self
     }
-    
+
     pub fn sell(mut self) -> Self {
         self.is_buy = Some(false);
         self
     }
-    
+
     pub fn limit_px(mut self, price: impl ToString) -> Self {
         self.limit_px = Some(price.to_string());
         self
     }
-    
+
     pub fn size(mut self, size: impl ToString) -> Self {
         self.sz = Some(size.to_string());
         self
     }
-    
+
     pub fn reduce_only(mut self, reduce: bool) -> Self {
         self.reduce_only = reduce;
         self
     }
-    
+
     pub fn order_type(mut self, order_type: OrderType) -> Self {
         self.order_type = Some(order_type);
         self
     }
-    
+
     pub fn cloid(mut self, id: Uuid) -> Self {
         self.cloid = Some(id);
         self
     }
-    
+
     // Convenience methods for common order types
     pub fn limit_buy(self, price: impl ToString, size: impl ToString) -> Self {
-        self.buy()
-            .limit_px(price)
-            .size(size)
+        self.buy().limit_px(price).size(size)
     }
-    
+
     pub fn limit_sell(self, price: impl ToString, size: impl ToString) -> Self {
-        self.sell()
-            .limit_px(price)
-            .size(size)
+        self.sell().limit_px(price).size(size)
     }
-    
-    pub fn trigger_buy(self, trigger_px: impl ToString, size: impl ToString, tpsl: &str) -> Self {
+
+    pub fn trigger_buy(
+        self,
+        trigger_px: impl ToString,
+        size: impl ToString,
+        tpsl: &str,
+    ) -> Self {
         self.buy()
             .size(size)
             .order_type(OrderType::Trigger(Trigger {
@@ -681,8 +782,13 @@ impl<'a, S: HyperliquidSigner> OrderBuilder<'a, S> {
                 tpsl: tpsl.to_string(),
             }))
     }
-    
-    pub fn trigger_sell(self, trigger_px: impl ToString, size: impl ToString, tpsl: &str) -> Self {
+
+    pub fn trigger_sell(
+        self,
+        trigger_px: impl ToString,
+        size: impl ToString,
+        tpsl: &str,
+    ) -> Self {
         self.sell()
             .size(size)
             .order_type(OrderType::Trigger(Trigger {
@@ -691,7 +797,7 @@ impl<'a, S: HyperliquidSigner> OrderBuilder<'a, S> {
                 tpsl: tpsl.to_string(),
             }))
     }
-    
+
     pub fn build(self) -> Result<OrderRequest> {
         Ok(OrderRequest {
             asset: self.asset,
@@ -711,7 +817,7 @@ impl<'a, S: HyperliquidSigner> OrderBuilder<'a, S> {
             cloid: self.cloid.map(|id| format!("{:032x}", id.as_u128())),
         })
     }
-    
+
     pub async fn send(self) -> Result<ExchangeResponseStatus> {
         let provider = self.provider;
         let order = self.build()?;

@@ -1,5 +1,5 @@
 //! Pre-defined symbols for common Hyperliquid assets
-//! 
+//!
 //! For perpetuals, use the coin name directly (e.g., `BTC`, `ETH`)
 //! For spot pairs, use the Hyperliquid notation (e.g., `@0` for PURR/USDC)
 
@@ -1180,11 +1180,11 @@ pub const TEST_BTC_USDC: Symbol = Symbol::from_static("@35");
 pub const USDC: Symbol = Symbol::from_static("USDC");
 
 /// Create a new symbol at runtime (for assets not yet in the SDK)
-/// 
+///
 /// # Example
 /// ```
 /// use ferrofluid::types::symbols::symbol;
-/// 
+///
 /// let new_coin = symbol("NEWCOIN");
 /// let new_spot = symbol("@999");
 /// ```
@@ -1195,43 +1195,60 @@ pub fn symbol(s: impl Into<String>) -> Symbol {
 // ==================== PRELUDE ====================
 
 /// Commonly used symbols for easy importing
-/// 
+///
 /// # Example
 /// ```
 /// use ferrofluid::types::symbols::prelude::*;
-/// 
+///
 /// // Now you can use BTC, ETH, etc. directly
 /// assert_eq!(BTC.as_str(), "BTC");
 /// assert_eq!(HYPE_USDC.as_str(), "@105");
-/// 
+///
 /// // Create runtime symbols
 /// let new_coin = symbol("NEWCOIN");
 /// assert_eq!(new_coin.as_str(), "NEWCOIN");
 /// ```
 pub mod prelude {
     pub use super::{
-        // Major perpetuals
-        BTC, ETH, SOL, BNB, MATIC, AVAX, ARB, OP, SUI, DOGE,
-        
         // Popular alts
-        APT, INJ, SEI, TIA, WIF, KPEPE, 
-        
+        APT,
+        ARB,
+        AVAX,
+        BNB,
+        // Major perpetuals
+        BTC,
+        DOGE,
+
+        ETH,
         // Hyperliquid native
-        HYPE, PURR,
-        
+        HYPE,
         // Major spot pairs
-        HYPE_USDC, PURR_USDC,
-        
+        HYPE_USDC,
+        INJ,
+        KPEPE,
+
+        MATIC,
+        OP,
+        PURR,
+
+        PURR_USDC,
+
+        SEI,
+        SOL,
+        SUI,
+        // Testnet symbols
+        TEST_BTC,
+        TEST_ETH,
+        TEST_SOL,
+
+        TIA,
         // Common quote currency
         USDC,
-        
-        // Testnet symbols
-        TEST_BTC, TEST_ETH, TEST_SOL,
-        
+
+        WIF,
         // Runtime symbol creation
         symbol,
     };
-    
     // Re-export Symbol type for convenience
     pub use crate::types::symbol::Symbol;
 }
@@ -1239,36 +1256,36 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_predefined_symbols() {
         assert_eq!(BTC.as_str(), "BTC");
         assert!(BTC.is_perp());
-        
+
         assert_eq!(HYPE_USDC.as_str(), "@105");
         assert!(HYPE_USDC.is_spot());
     }
-    
+
     #[test]
     fn test_runtime_symbol_creation() {
         let new_perp = symbol("NEWCOIN");
         assert_eq!(new_perp.as_str(), "NEWCOIN");
         assert!(new_perp.is_perp());
-        
+
         let new_spot = symbol("@999");
         assert_eq!(new_spot.as_str(), "@999");
         assert!(new_spot.is_spot());
     }
-    
+
     #[test]
     fn test_prelude_imports() {
         // Test that prelude symbols work
         use crate::types::symbols::prelude::*;
-        
+
         assert_eq!(BTC.as_str(), "BTC");
         assert_eq!(ETH.as_str(), "ETH");
         assert_eq!(HYPE_USDC.as_str(), "@105");
-        
+
         // Test runtime creation through prelude
         let custom = symbol("CUSTOM");
         assert_eq!(custom.as_str(), "CUSTOM");

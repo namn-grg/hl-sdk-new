@@ -1,3 +1,3 @@
 pub mod signer;
 
-pub use signer::{HyperliquidSigner, HyperliquidSignature, SignerError, AlloySigner};
+pub use signer::{AlloySigner, HyperliquidSignature, HyperliquidSigner, SignerError};

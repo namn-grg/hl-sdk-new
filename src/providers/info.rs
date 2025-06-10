@@ -36,15 +36,15 @@ impl RateLimiter {
     pub fn check_weight(&self, weight: u32) -> Result<(), HyperliquidError> {
         let mut tokens = self.tokens.lock().unwrap();
         let mut last_refill = self.last_refill.lock().unwrap();
-        
+
         // Refill tokens based on elapsed time
         let now = Instant::now();
         let elapsed = now.duration_since(*last_refill).as_secs_f64();
         let tokens_to_add = elapsed * self.refill_rate;
-        
+
         *tokens = (*tokens + tokens_to_add).min(self.max_tokens);
         *last_refill = now;
-        
+
         // Check if we have enough tokens
         if *tokens >= weight as f64 {
             *tokens -= weight as f64;
@@ -75,7 +75,7 @@ impl InfoProvider {
     pub fn new(network: Network) -> Self {
         // Initialize rustls crypto provider if not already set
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-        
+
         let https = HttpsConnectorBuilder::new()
             .with_native_roots()
             .expect("TLS initialization failed")
@@ -83,8 +83,7 @@ impl InfoProvider {
             .enable_http1()
             .build();
 
-        let client = Client::builder(TokioExecutor::new())
-            .build(https);
+        let client = Client::builder(TokioExecutor::new()).build(https);
 
         Self {
             client,
@@ -95,23 +94,34 @@ impl InfoProvider {
         }
     }
 
-    async fn request<T>(&self, request_json: serde_json::Value) -> Result<T, HyperliquidError>
+    async fn request<T>(
+        &self,
+        request_json: serde_json::Value,
+    ) -> Result<T, HyperliquidError>
     where
         T: serde::de::DeserializeOwned,
     {
         let body_string = serde_json::to_string(&request_json)?;
         let body_bytes = Bytes::from(body_string);
-        
+
         let req = Request::builder()
             .method(Method::POST)
             .uri(self.endpoint)
             .header("Content-Type", "application/json")
             .body(Full::new(body_bytes))?;
 
-        let res = self.client.request(req).await.map_err(|e| HyperliquidError::Network(e.to_string()))?;
+        let res = self
+            .client
+            .request(req)
+            .await
+            .map_err(|e| HyperliquidError::Network(e.to_string()))?;
         let status = res.status();
-        
-        let body_bytes = res.collect().await.map_err(|e| HyperliquidError::Network(e.to_string()))?.to_bytes();
+
+        let body_bytes = res
+            .collect()
+            .await
+            .map_err(|e| HyperliquidError::Network(e.to_string()))?
+            .to_bytes();
         let body_str = String::from_utf8_lossy(&body_bytes);
 
         if !status.is_success() {
@@ -134,7 +144,10 @@ impl InfoProvider {
         self.request(request).await
     }
 
-    pub async fn user_state(&self, user: Address) -> Result<UserStateResponse, HyperliquidError> {
+    pub async fn user_state(
+        &self,
+        user: Address,
+    ) -> Result<UserStateResponse, HyperliquidError> {
         let request = json!({
             "type": "clearinghouseState",
             "user": user
@@ -142,7 +155,10 @@ impl InfoProvider {
         self.request(request).await
     }
 
-    pub async fn l2_book(&self, coin: &str) -> Result<L2SnapshotResponse, HyperliquidError> {
+    pub async fn l2_book(
+        &self,
+        coin: &str,
+    ) -> Result<L2SnapshotResponse, HyperliquidError> {
         let request = json!({
             "type": "l2Book",
             "coin": coin
@@ -150,7 +166,11 @@ impl InfoProvider {
         self.request(request).await
     }
 
-    pub async fn order_status(&self, user: Address, oid: u64) -> Result<OrderStatusResponse, HyperliquidError> {
+    pub async fn order_status(
+        &self,
+        user: Address,
+        oid: u64,
+    ) -> Result<OrderStatusResponse, HyperliquidError> {
         let request = json!({
             "type": "orderStatus",
             "user": user,
@@ -159,7 +179,10 @@ impl InfoProvider {
         self.request(request).await
     }
 
-    pub async fn open_orders(&self, user: Address) -> Result<Vec<OpenOrdersResponse>, HyperliquidError> {
+    pub async fn open_orders(
+        &self,
+        user: Address,
+    ) -> Result<Vec<OpenOrdersResponse>, HyperliquidError> {
         let request = json!({
             "type": "openOrders",
             "user": user
@@ -167,7 +190,10 @@ impl InfoProvider {
         self.request(request).await
     }
 
-    pub async fn user_fills(&self, user: Address) -> Result<Vec<UserFillsResponse>, HyperliquidError> {
+    pub async fn user_fills(
+        &self,
+        user: Address,
+    ) -> Result<Vec<UserFillsResponse>, HyperliquidError> {
         let request = json!({
             "type": "userFills",
             "user": user
@@ -175,21 +201,29 @@ impl InfoProvider {
         self.request(request).await
     }
 
-    pub async fn user_funding(&self, user: Address, start_time: u64, end_time: Option<u64>) -> Result<Vec<UserFundingResponse>, HyperliquidError> {
+    pub async fn user_funding(
+        &self,
+        user: Address,
+        start_time: u64,
+        end_time: Option<u64>,
+    ) -> Result<Vec<UserFundingResponse>, HyperliquidError> {
         let mut request = json!({
             "type": "userFunding",
             "user": user,
             "startTime": start_time
         });
-        
+
         if let Some(end) = end_time {
             request["endTime"] = json!(end);
         }
-        
+
         self.request(request).await
     }
 
-    pub async fn user_fees(&self, user: Address) -> Result<UserFeesResponse, HyperliquidError> {
+    pub async fn user_fees(
+        &self,
+        user: Address,
+    ) -> Result<UserFeesResponse, HyperliquidError> {
         let request = json!({
             "type": "userFees",
             "user": user
@@ -197,7 +231,10 @@ impl InfoProvider {
         self.request(request).await
     }
 
-    pub async fn recent_trades(&self, coin: &str) -> Result<Vec<RecentTradesResponse>, HyperliquidError> {
+    pub async fn recent_trades(
+        &self,
+        coin: &str,
+    ) -> Result<Vec<RecentTradesResponse>, HyperliquidError> {
         let request = json!({
             "type": "recentTrades",
             "coin": coin
@@ -205,7 +242,10 @@ impl InfoProvider {
         self.request(request).await
     }
 
-    pub async fn user_token_balances(&self, user: Address) -> Result<UserTokenBalanceResponse, HyperliquidError> {
+    pub async fn user_token_balances(
+        &self,
+        user: Address,
+    ) -> Result<UserTokenBalanceResponse, HyperliquidError> {
         let request = json!({
             "type": "spotClearinghouseState",
             "user": user
@@ -213,7 +253,10 @@ impl InfoProvider {
         self.request(request).await
     }
 
-    pub async fn referral(&self, user: Address) -> Result<ReferralResponse, HyperliquidError> {
+    pub async fn referral(
+        &self,
+        user: Address,
+    ) -> Result<ReferralResponse, HyperliquidError> {
         let request = json!({
             "type": "referral",
             "user": user
@@ -235,7 +278,9 @@ impl InfoProvider {
         self.request(request).await
     }
 
-    pub async fn spot_meta_and_asset_ctxs(&self) -> Result<SpotMetaAndAssetCtxs, HyperliquidError> {
+    pub async fn spot_meta_and_asset_ctxs(
+        &self,
+    ) -> Result<SpotMetaAndAssetCtxs, HyperliquidError> {
         let request = json!({
             "type": "spotMetaAndAssetCtxs"
         });
@@ -297,12 +342,15 @@ impl<'a> CandlesRequestBuilder<'a> {
     }
 
     pub async fn send(self) -> Result<Vec<CandlesSnapshotResponse>, HyperliquidError> {
-        let interval = self.interval
-            .ok_or_else(|| HyperliquidError::InvalidRequest("interval is required".into()))?;
-        let start_time = self.start_time
-            .ok_or_else(|| HyperliquidError::InvalidRequest("start_time is required".into()))?;
-        let end_time = self.end_time
-            .ok_or_else(|| HyperliquidError::InvalidRequest("end_time is required".into()))?;
+        let interval = self.interval.ok_or_else(|| {
+            HyperliquidError::InvalidRequest("interval is required".into())
+        })?;
+        let start_time = self.start_time.ok_or_else(|| {
+            HyperliquidError::InvalidRequest("start_time is required".into())
+        })?;
+        let end_time = self.end_time.ok_or_else(|| {
+            HyperliquidError::InvalidRequest("end_time is required".into())
+        })?;
 
         let request = json!({
             "type": "candleSnapshot",
@@ -343,8 +391,9 @@ impl<'a> FundingHistoryBuilder<'a> {
     }
 
     pub async fn send(self) -> Result<Vec<FundingHistoryResponse>, HyperliquidError> {
-        let start_time = self.start_time
-            .ok_or_else(|| HyperliquidError::InvalidRequest("start_time is required".into()))?;
+        let start_time = self.start_time.ok_or_else(|| {
+            HyperliquidError::InvalidRequest("start_time is required".into())
+        })?;
 
         let mut request = json!({
             "type": "fundingHistory",

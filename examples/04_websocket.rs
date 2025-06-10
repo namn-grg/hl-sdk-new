@@ -1,10 +1,6 @@
 //! Example of using the WebSocket provider for real-time data
 
-use ferrofluid::{
-    providers::WsProvider,
-    types::ws::Message,
-    Network,
-};
+use ferrofluid::{Network, providers::WsProvider, types::ws::Message};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -31,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut message_count = 0;
     let timeout = tokio::time::sleep(std::time::Duration::from_secs(10));
     tokio::pin!(timeout);
-    
+
     loop {
         tokio::select! {
             // Handle BTC book updates
@@ -56,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => {}
                 }
             }
-            
+
             // Handle all mids updates
             Some(msg) = mids_rx.recv() => {
                 match msg {
@@ -71,20 +67,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => {}
                 }
             }
-            
+
             // Handle timeout
             _ = &mut timeout => {
                 println!("\nDemo timeout reached after 10 seconds");
                 break;
             }
-            
+
             // Handle channel closure
             else => {
                 println!("\nAll channels closed, exiting");
                 break;
             }
         }
-        
+
         // Optional: Exit after certain number of messages
         if message_count >= 20 {
             println!("\nReceived {} messages, exiting demo", message_count);

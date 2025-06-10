@@ -1,21 +1,21 @@
 //! WebSocket provider for real-time market data and user events
 
+use std::sync::{
+    Arc,
+    atomic::{AtomicU32, Ordering},
+};
+
+use dashmap::DashMap;
+use fastwebsockets::{Frame, OpCode, Role, WebSocket, handshake};
+use http_body_util::Empty;
+use hyper::{Request, StatusCode, body::Bytes, header, upgrade::Upgraded};
+use hyper_util::rt::TokioIo;
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+
 use crate::{
+    Network,
     errors::HyperliquidError,
     types::ws::{Message, Subscription, WsRequest},
-    Network,
-};
-use dashmap::DashMap;
-use fastwebsockets::{handshake, Frame, OpCode, WebSocket, Role};
-use http_body_util::Empty;
-use hyper::{body::Bytes, header, upgrade::Upgraded, Request, StatusCode};
-use hyper_util::rt::TokioIo;
-use std::sync::{
-    atomic::{AtomicU32, Ordering},
-    Arc,
-};
-use tokio::{
-    sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
 };
 
 pub type SubscriptionId = u32;
@@ -27,7 +27,7 @@ struct SubscriptionHandle {
 }
 
 /// WebSocket provider for Hyperliquid
-/// 
+///
 /// This is a thin wrapper around fastwebsockets that provides:
 /// - Type-safe subscriptions
 /// - Simple message routing
@@ -55,7 +55,7 @@ impl WsProvider {
 
         // Create message routing channel
         let (message_tx, message_rx) = mpsc::unbounded_channel();
-        
+
         // Spawn message routing task
         let subscriptions_clone = subscriptions.clone();
         let task_handle = tokio::spawn(async move {
@@ -75,16 +75,19 @@ impl WsProvider {
     async fn establish_connection(
         url: &str,
     ) -> Result<WebSocket<TokioIo<Upgraded>>, HyperliquidError> {
-        use hyper_util::client::legacy::Client;
         use hyper_rustls::HttpsConnectorBuilder;
-        
-        let uri = url.parse::<hyper::Uri>()
+        use hyper_util::client::legacy::Client;
+
+        let uri = url
+            .parse::<hyper::Uri>()
             .map_err(|e| HyperliquidError::WebSocket(format!("Invalid URL: {}", e)))?;
-        
+
         // Create HTTPS connector with proper configuration
         let https = HttpsConnectorBuilder::new()
             .with_native_roots()
-            .map_err(|e| HyperliquidError::WebSocket(format!("Failed to load native roots: {}", e)))?
+            .map_err(|e| {
+                HyperliquidError::WebSocket(format!("Failed to load native roots: {}", e))
+            })?
             .https_only()
             .enable_http1()
             .build();
@@ -93,9 +96,10 @@ impl WsProvider {
             .build::<_, Empty<Bytes>>(https);
 
         // Create WebSocket upgrade request
-        let host = uri.host()
+        let host = uri
+            .host()
             .ok_or_else(|| HyperliquidError::WebSocket("No host in URL".to_string()))?;
-        
+
         let req = Request::builder()
             .method("GET")
             .uri(&uri)
@@ -105,21 +109,29 @@ impl WsProvider {
             .header(header::SEC_WEBSOCKET_VERSION, "13")
             .header(header::SEC_WEBSOCKET_KEY, handshake::generate_key())
             .body(Empty::new())
-            .map_err(|e| HyperliquidError::WebSocket(format!("Request build failed: {}", e)))?;
+            .map_err(|e| {
+                HyperliquidError::WebSocket(format!("Request build failed: {}", e))
+            })?;
 
-        let res = client.request(req).await
-            .map_err(|e| HyperliquidError::WebSocket(format!("HTTP request failed: {}", e)))?;
+        let res = client.request(req).await.map_err(|e| {
+            HyperliquidError::WebSocket(format!("HTTP request failed: {}", e))
+        })?;
 
         if res.status() != StatusCode::SWITCHING_PROTOCOLS {
-            return Err(HyperliquidError::WebSocket(
-                format!("WebSocket upgrade failed: {}", res.status())
-            ));
+            return Err(HyperliquidError::WebSocket(format!(
+                "WebSocket upgrade failed: {}",
+                res.status()
+            )));
         }
 
-        let upgraded = hyper::upgrade::on(res).await
+        let upgraded = hyper::upgrade::on(res)
+            .await
             .map_err(|e| HyperliquidError::WebSocket(format!("Upgrade failed: {}", e)))?;
 
-        Ok(WebSocket::after_handshake(TokioIo::new(upgraded), Role::Client))
+        Ok(WebSocket::after_handshake(
+            TokioIo::new(upgraded),
+            Role::Client,
+        ))
     }
 
     /// Subscribe to L2 order book updates
@@ -156,60 +168,75 @@ impl WsProvider {
         &mut self,
         subscription: Subscription,
     ) -> Result<(SubscriptionId, UnboundedReceiver<Message>), HyperliquidError> {
-        let ws = self.ws.as_mut()
+        let ws = self
+            .ws
+            .as_mut()
             .ok_or_else(|| HyperliquidError::WebSocket("Not connected".to_string()))?;
 
         // Send subscription request
         let request = WsRequest::subscribe(subscription.clone());
         let payload = serde_json::to_string(&request)
             .map_err(|e| HyperliquidError::Serialize(e.to_string()))?;
-        
+
         ws.write_frame(Frame::text(payload.into_bytes().into()))
             .await
-            .map_err(|e| HyperliquidError::WebSocket(format!("Failed to send subscription: {}", e)))?;
+            .map_err(|e| {
+                HyperliquidError::WebSocket(format!("Failed to send subscription: {}", e))
+            })?;
 
         // Create channel for this subscription
         let (tx, rx) = mpsc::unbounded_channel();
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
-        
-        self.subscriptions.insert(id, SubscriptionHandle {
-            subscription,
-            tx,
-        });
+
+        self.subscriptions
+            .insert(id, SubscriptionHandle { subscription, tx });
 
         Ok((id, rx))
     }
 
     /// Unsubscribe from a subscription
-    pub async fn unsubscribe(&mut self, id: SubscriptionId) -> Result<(), HyperliquidError> {
+    pub async fn unsubscribe(
+        &mut self,
+        id: SubscriptionId,
+    ) -> Result<(), HyperliquidError> {
         if let Some((_, handle)) = self.subscriptions.remove(&id) {
-            let ws = self.ws.as_mut()
-                .ok_or_else(|| HyperliquidError::WebSocket("Not connected".to_string()))?;
+            let ws = self.ws.as_mut().ok_or_else(|| {
+                HyperliquidError::WebSocket("Not connected".to_string())
+            })?;
 
             let request = WsRequest::unsubscribe(handle.subscription);
             let payload = serde_json::to_string(&request)
                 .map_err(|e| HyperliquidError::Serialize(e.to_string()))?;
-            
+
             ws.write_frame(Frame::text(payload.into_bytes().into()))
                 .await
-                .map_err(|e| HyperliquidError::WebSocket(format!("Failed to send unsubscribe: {}", e)))?;
+                .map_err(|e| {
+                    HyperliquidError::WebSocket(format!(
+                        "Failed to send unsubscribe: {}",
+                        e
+                    ))
+                })?;
         }
-        
+
         Ok(())
     }
 
     /// Send a ping to keep connection alive
     pub async fn ping(&mut self) -> Result<(), HyperliquidError> {
-        let ws = self.ws.as_mut()
+        let ws = self
+            .ws
+            .as_mut()
             .ok_or_else(|| HyperliquidError::WebSocket("Not connected".to_string()))?;
 
         let request = WsRequest::ping();
         let payload = serde_json::to_string(&request)
             .map_err(|e| HyperliquidError::Serialize(e.to_string()))?;
-        
+
         ws.write_frame(Frame::text(payload.into_bytes().into()))
             .await
-            .map_err(|e| HyperliquidError::WebSocket(format!("Failed to send ping: {}", e)))?;
+            .map_err(|e| {
+                HyperliquidError::WebSocket(format!("Failed to send ping: {}", e))
+            })?;
 
         Ok(())
     }
@@ -221,28 +248,29 @@ impl WsProvider {
 
     /// Start reading messages (must be called after connecting)
     pub async fn start_reading(&mut self) -> Result<(), HyperliquidError> {
-        let mut ws = self.ws.take()
+        let mut ws = self
+            .ws
+            .take()
             .ok_or_else(|| HyperliquidError::WebSocket("Not connected".to_string()))?;
-        
-        let message_tx = self.message_tx.clone()
-            .ok_or_else(|| HyperliquidError::WebSocket("Message channel not initialized".to_string()))?;
+
+        let message_tx = self.message_tx.clone().ok_or_else(|| {
+            HyperliquidError::WebSocket("Message channel not initialized".to_string())
+        })?;
 
         tokio::spawn(async move {
             loop {
                 match ws.read_frame().await {
-                    Ok(frame) => {
-                        match frame.opcode {
-                            OpCode::Text => {
-                                if let Ok(text) = String::from_utf8(frame.payload.to_vec()) {
-                                    let _ = message_tx.send(text);
-                                }
+                    Ok(frame) => match frame.opcode {
+                        OpCode::Text => {
+                            if let Ok(text) = String::from_utf8(frame.payload.to_vec()) {
+                                let _ = message_tx.send(text);
                             }
-                            OpCode::Close => {
-                                break;
-                            }
-                            _ => {}
                         }
-                    }
+                        OpCode::Close => {
+                            break;
+                        }
+                        _ => {}
+                    },
                     Err(_) => {
                         break;
                     }

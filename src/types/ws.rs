@@ -1,8 +1,9 @@
 //! WebSocket message types for Hyperliquid
 
+use std::collections::HashMap;
+
 use alloy::primitives::Address;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 // Subscription types
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -222,11 +223,32 @@ pub struct LedgerUpdateData {
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "type")]
 pub enum LedgerUpdate {
-    Deposit { usdc: String },
-    Withdraw { usdc: String, nonce: u64, fee: String },
-    InternalTransfer { usdc: String, user: Address, destination: Address, fee: String },
-    SubAccountTransfer { usdc: String, user: Address, destination: Address },
-    SpotTransfer { token: String, amount: String, user: Address, destination: Address, fee: String },
+    Deposit {
+        usdc: String,
+    },
+    Withdraw {
+        usdc: String,
+        nonce: u64,
+        fee: String,
+    },
+    InternalTransfer {
+        usdc: String,
+        user: Address,
+        destination: Address,
+        fee: String,
+    },
+    SubAccountTransfer {
+        usdc: String,
+        user: Address,
+        destination: Address,
+    },
+    SpotTransfer {
+        token: String,
+        amount: String,
+        user: Address,
+        destination: Address,
+        fee: String,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize)]
