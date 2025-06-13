@@ -101,6 +101,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### Managed WebSocket with Auto-Reconnect
+
+For production use, consider the `ManagedWsProvider` which adds automatic reconnection and keep-alive:
+
+```rust
+use ferrofluid::{ManagedWsProvider, WsConfig, Network};
+use std::time::Duration;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Configure with custom settings
+    let config = WsConfig {
+        ping_interval: Duration::from_secs(30),
+        auto_reconnect: true,
+        exponential_backoff: true,
+        ..Default::default()
+    };
+    
+    let ws = ManagedWsProvider::connect(Network::Mainnet, config).await?;
+    
+    // Subscriptions automatically restore on reconnect
+    let (_id, mut rx) = ws.subscribe_l2_book("BTC").await?;
+    ws.start_reading().await?;
+    
+    // Your subscriptions survive disconnections!
+    while let Some(msg) = rx.recv().await {
+        // Handle messages...
+    }
+    
+    Ok(())
+}
+```
+
 ## Examples
 
 The `examples/` directory contains comprehensive examples:
@@ -111,6 +144,8 @@ The `examples/` directory contains comprehensive examples:
 - `03_exchange_provider.rs` - Placing and managing orders
 - `04_websocket.rs` - Real-time WebSocket subscriptions
 - `05_builder_orders.rs` - Using MEV builders for orders
+- `06_basis_trade.rs` - Example basis trading strategy
+- `07_managed_websocket.rs` - WebSocket with auto-reconnect and keep-alive
 
 Run examples with:
 ```bash

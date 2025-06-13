@@ -14,6 +14,7 @@ use serde_json::json;
 use crate::constants::Network;
 use crate::errors::HyperliquidError;
 use crate::types::info_types::*;
+use crate::types::Symbol;
 
 // Rate limiter implementation
 pub struct RateLimiter {
@@ -157,11 +158,12 @@ impl InfoProvider {
 
     pub async fn l2_book(
         &self,
-        coin: &str,
+        coin: impl Into<Symbol>,
     ) -> Result<L2SnapshotResponse, HyperliquidError> {
+        let symbol = coin.into();
         let request = json!({
             "type": "l2Book",
-            "coin": coin
+            "coin": symbol.as_str()
         });
         self.request(request).await
     }
@@ -233,11 +235,12 @@ impl InfoProvider {
 
     pub async fn recent_trades(
         &self,
-        coin: &str,
+        coin: impl Into<Symbol>,
     ) -> Result<Vec<RecentTradesResponse>, HyperliquidError> {
+        let symbol = coin.into();
         let request = json!({
             "type": "recentTrades",
-            "coin": coin
+            "coin": symbol.as_str()
         });
         self.request(request).await
     }
@@ -289,7 +292,7 @@ impl InfoProvider {
 
     // ==================== Builder Pattern Methods ====================
 
-    pub fn candles(&self, coin: impl Into<String>) -> CandlesRequestBuilder {
+    pub fn candles(&self, coin: impl Into<Symbol>) -> CandlesRequestBuilder {
         CandlesRequestBuilder {
             provider: self,
             coin: coin.into(),
@@ -299,7 +302,7 @@ impl InfoProvider {
         }
     }
 
-    pub fn funding_history(&self, coin: impl Into<String>) -> FundingHistoryBuilder {
+    pub fn funding_history(&self, coin: impl Into<Symbol>) -> FundingHistoryBuilder {
         FundingHistoryBuilder {
             provider: self,
             coin: coin.into(),
@@ -313,7 +316,7 @@ impl InfoProvider {
 
 pub struct CandlesRequestBuilder<'a> {
     provider: &'a InfoProvider,
-    coin: String,
+    coin: Symbol,
     interval: Option<String>,
     start_time: Option<u64>,
     end_time: Option<u64>,
@@ -355,7 +358,7 @@ impl<'a> CandlesRequestBuilder<'a> {
         let request = json!({
             "type": "candleSnapshot",
             "req": {
-                "coin": self.coin,
+                "coin": self.coin.as_str(),
                 "interval": interval,
                 "startTime": start_time,
                 "endTime": end_time
@@ -368,7 +371,7 @@ impl<'a> CandlesRequestBuilder<'a> {
 
 pub struct FundingHistoryBuilder<'a> {
     provider: &'a InfoProvider,
-    coin: String,
+    coin: Symbol,
     start_time: Option<u64>,
     end_time: Option<u64>,
 }
@@ -397,7 +400,7 @@ impl<'a> FundingHistoryBuilder<'a> {
 
         let mut request = json!({
             "type": "fundingHistory",
-            "coin": self.coin,
+            "coin": self.coin.as_str(),
             "startTime": start_time
         });
 

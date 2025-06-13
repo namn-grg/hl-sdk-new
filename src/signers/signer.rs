@@ -33,6 +33,35 @@ pub struct AlloySigner<S: Signer> {
     pub inner: S,
 }
 
+// Direct implementation for PrivateKeySigner
+#[async_trait]
+impl HyperliquidSigner for alloy::signers::local::PrivateKeySigner {
+    async fn sign_hash(&self, hash: B256) -> Result<HyperliquidSignature, SignerError> {
+        let sig = <Self as Signer>::sign_hash(self, &hash)
+            .await
+            .map_err(|e| SignerError::SigningFailed(e.to_string()))?;
+
+        // Convert Parity to v value (27 or 28)
+        let v = match sig.v() {
+            Parity::Eip155(v) => v,
+            Parity::NonEip155(true) => 28,
+            Parity::NonEip155(false) => 27,
+            Parity::Parity(true) => 28,
+            Parity::Parity(false) => 27,
+        };
+
+        Ok(HyperliquidSignature {
+            r: sig.r(),
+            s: sig.s(),
+            v,
+        })
+    }
+
+    fn address(&self) -> Address {
+        self.address()
+    }
+}
+
 #[async_trait]
 impl<S> HyperliquidSigner for AlloySigner<S>
 where
