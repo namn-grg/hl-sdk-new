@@ -483,14 +483,55 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
         };
 
         let action = ApproveAgent {
-            signature_chain_id: chain_id,
+            signature_chain_id: 421614, // Always use Arbitrum Sepolia chain ID like SDK
             hyperliquid_chain: chain.to_string(),
-            agent_address: format!("{:#x}", agent_address),
+            agent_address,
             agent_name,
             nonce: Self::current_nonce(),
         };
 
         self.send_user_action(&action).await
+    }
+    
+    /// Approve a new agent, generating a random key like the original SDK
+    /// Returns (private_key_hex, response)
+    pub async fn approve_agent_new(&self) -> Result<(String, ExchangeResponseStatus)> {
+        use rand::Rng;
+        use alloy::signers::local::PrivateKeySigner;
+        use alloy::primitives::B256;
+        
+        // Generate random key
+        let mut rng = rand::thread_rng();
+        let mut key_bytes = [0u8; 32];
+        rng.fill(&mut key_bytes);
+        let key_hex = hex::encode(&key_bytes);
+        
+        // Create a signer from the key to get the address
+        let signer = PrivateKeySigner::from_bytes(&B256::from(key_bytes))
+            .map_err(|e| HyperliquidError::InvalidRequest(format!("Failed to create signer: {}", e)))?;
+        let agent_address = signer.address();
+        
+        // Get chain info
+        let (_, _) = self.infer_network();
+        let chain = if self.endpoint.contains("testnet") {
+            "Testnet"
+        } else {
+            "Mainnet"
+        };
+        
+        // Create the action with proper Address type
+        let action = ApproveAgent {
+            signature_chain_id: 421614, // Always use Arbitrum Sepolia chain ID
+            hyperliquid_chain: chain.to_string(),
+            agent_address,
+            agent_name: None,
+            nonce: Self::current_nonce(),
+        };
+        
+        // Use send_user_action which handles EIP-712 signing
+        let response = self.send_user_action(&action).await?;
+        
+        Ok((key_hex, response))
     }
 
     pub async fn approve_builder_fee(
@@ -653,7 +694,7 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
             let (_, agent_source) = self.infer_network();
             json!({
                 "type": "agent",
-                "agentAddress": agent_address,
+                "agentAddress": format!("{:#x}", agent_address),
                 "agentAction": action_value,
                 "source": agent_source,
             })
@@ -687,11 +728,22 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
             .and_then(|v| v.as_u64())
             .unwrap_or_else(Self::current_nonce);
 
+        // For ApproveAgent, we need to use camelCase type name to match SDK
+        let type_tag = match action_type {
+            "ApproveAgent" => "approveAgent",
+            "UsdSend" => "usdSend",
+            "Withdraw" => "withdraw3",
+            "SpotSend" => "spotSend",
+            "ApproveBuilderFee" => "approveBuilderFee",
+            _ => action_type,
+        };
+        
         // Add type tag
         if let Value::Object(ref mut map) = action_value {
-            map.insert("type".to_string(), json!(action_type));
+            map.insert("type".to_string(), json!(type_tag));
         }
-
+        
+        // Send directly without L1 wrapping for user actions
         self.post(action_value, signature, nonce).await
     }
 
@@ -714,7 +766,6 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
             "nonce": nonce,
             "vaultAddress": self.vault_address,
         });
-
 
         let body = Full::new(Bytes::from(serde_json::to_vec(&payload)?));
         let request = Request::builder()

@@ -48,17 +48,54 @@ hyperliquid_action! {
     => encode(hyperliquid_chain, destination, token, amount, time)
 }
 
-hyperliquid_action! {
-    /// Approve an agent for trading
-    struct ApproveAgent {
-        pub signature_chain_id: u64,
-        pub hyperliquid_chain: String,
-        pub agent_address: String,
-        pub agent_name: Option<String>,
-        pub nonce: u64,
+// ApproveAgent needs custom serialization for the address field
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApproveAgent {
+    #[serde(serialize_with = "serialize_chain_id")]
+    pub signature_chain_id: u64,
+    pub hyperliquid_chain: String,
+    #[serde(serialize_with = "serialize_address")]
+    pub agent_address: alloy::primitives::Address,
+    pub agent_name: Option<String>,
+    pub nonce: u64,
+}
+
+pub(crate) fn serialize_address<S>(address: &alloy::primitives::Address, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&format!("{:#x}", address))
+}
+
+pub(crate) fn serialize_chain_id<S>(chain_id: &u64, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    // Serialize as hex string to match SDK format
+    serializer.serialize_str(&format!("{:#x}", chain_id))
+}
+
+impl crate::types::eip712::HyperliquidAction for ApproveAgent {
+    const TYPE_STRING: &'static str = "ApproveAgent(string hyperliquidChain,address agentAddress,string agentName,uint64 nonce)";
+    const USE_PREFIX: bool = true;
+
+    fn chain_id(&self) -> Option<u64> {
+        Some(self.signature_chain_id)
     }
-    => "ApproveAgent(string hyperliquidChain,address agentAddress,string agentName,uint64 nonce)"
-    => encode(hyperliquid_chain, agent_address, agent_name, nonce)
+
+    fn encode_data(&self) -> Vec<u8> {
+        use crate::types::eip712::encode_value;
+        let mut encoded = Vec::new();
+        encoded.extend_from_slice(&Self::type_hash()[..]);
+        encoded.extend_from_slice(&encode_value(&self.hyperliquid_chain)[..]);
+        encoded.extend_from_slice(&encode_value(&self.agent_address)[..]);
+        // SDK uses unwrap_or_default() for agent_name
+        let agent_name = self.agent_name.clone().unwrap_or_default();
+        encoded.extend_from_slice(&encode_value(&agent_name)[..]);
+        encoded.extend_from_slice(&encode_value(&self.nonce)[..]);
+        encoded
+    }
 }
 
 hyperliquid_action! {

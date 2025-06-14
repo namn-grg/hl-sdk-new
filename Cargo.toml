@@ -49,6 +49,7 @@ hex = "0.4"
 uuid = { version = "1.10", features = ["v4", "serde"] }
 rmp-serde = "1.1"
 rust_decimal = { version = "1.36", features = ["serde"] }
+rand = "0.8"
 
 [dev-dependencies]
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
