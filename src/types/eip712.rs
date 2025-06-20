@@ -46,7 +46,7 @@ pub trait HyperliquidAction: Sized + serde::Serialize {
     }
 
     fn struct_hash(&self) -> B256 {
-        keccak256(&self.encode_data())
+        keccak256(self.encode_data())
     }
 
     fn eip712_signing_hash(&self, domain: &Eip712Domain) -> B256 {

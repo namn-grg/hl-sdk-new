@@ -4,6 +4,7 @@ pub mod websocket;
 pub mod nonce;
 pub mod agent;
 pub mod batcher;
+pub mod order_tracker;
 
 // Raw providers (backwards compatibility)
 pub use exchange::RawExchangeProvider as ExchangeProvider;

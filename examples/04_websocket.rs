@@ -32,39 +32,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::select! {
             // Handle BTC book updates
             Some(msg) = btc_book_rx.recv() => {
-                match msg {
-                    Message::L2Book(book) => {
-                        println!("BTC book update:");
-                        println!("  Coin: {}", book.data.coin);
-                        println!("  Time: {}", book.data.time);
-                        if let Some(bids) = book.data.levels.get(0) {
-                            if let Some(best_bid) = bids.first() {
-                                println!("  Best bid: {} @ {}", best_bid.sz, best_bid.px);
-                            }
+                if let Message::L2Book(book) = msg {
+                    println!("BTC book update:");
+                    println!("  Coin: {}", book.data.coin);
+                    println!("  Time: {}", book.data.time);
+                    if let Some(bids) = book.data.levels.first() {
+                        if let Some(best_bid) = bids.first() {
+                            println!("  Best bid: {} @ {}", best_bid.sz, best_bid.px);
                         }
-                        if let Some(asks) = book.data.levels.get(1) {
-                            if let Some(best_ask) = asks.first() {
-                                println!("  Best ask: {} @ {}", best_ask.sz, best_ask.px);
-                            }
-                        }
-                        message_count += 1;
                     }
-                    _ => {}
+                    if let Some(asks) = book.data.levels.get(1) {
+                        if let Some(best_ask) = asks.first() {
+                            println!("  Best ask: {} @ {}", best_ask.sz, best_ask.px);
+                        }
+                    }
+                    message_count += 1;
                 }
             }
 
             // Handle all mids updates
             Some(msg) = mids_rx.recv() => {
-                match msg {
-                    Message::AllMids(mids) => {
-                        println!("\nMid prices update:");
-                        for (coin, price) in mids.data.mids.iter().take(5) {
-                            println!("  {}: {}", coin, price);
-                        }
-                        println!("  ... and {} more", mids.data.mids.len().saturating_sub(5));
-                        message_count += 1;
+                if let Message::AllMids(mids) = msg {
+                    println!("\nMid prices update:");
+                    for (coin, price) in mids.data.mids.iter().take(5) {
+                        println!("  {}: {}", coin, price);
                     }
-                    _ => {}
+                    println!("  ... and {} more", mids.data.mids.len().saturating_sub(5));
+                    message_count += 1;
                 }
             }
 

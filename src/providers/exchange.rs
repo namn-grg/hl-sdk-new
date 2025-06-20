@@ -20,6 +20,7 @@ use crate::{
         actions::*, eip712::HyperliquidAction, requests::*,
         responses::ExchangeResponseStatus, Symbol,
     },
+    providers::order_tracker::{OrderTracker, OrderStatus, TrackedOrder},
 };
 
 type Result<T> = std::result::Result<T, HyperliquidError>;
@@ -49,6 +50,7 @@ pub struct RawExchangeProvider<S: HyperliquidSigner> {
     vault_address: Option<Address>,
     agent: Option<Address>,
     builder: Option<Address>,
+    order_tracker: Option<OrderTracker>,
 }
 
 impl<S: HyperliquidSigner> RawExchangeProvider<S> {
@@ -65,6 +67,74 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
     /// Get the configured builder address
     pub fn builder(&self) -> Option<Address> {
         self.builder
+    }
+
+    /// Enable order tracking for this exchange instance
+    pub fn with_order_tracking(mut self) -> Self {
+        self.order_tracker = Some(OrderTracker::new());
+        self
+    }
+
+    // ==================== Order Tracking Methods ====================
+
+    /// Get a tracked order by CLOID
+    pub fn get_tracked_order(&self, cloid: &Uuid) -> Option<TrackedOrder> {
+        self.order_tracker.as_ref()?.get_order(cloid)
+    }
+
+    /// Get all tracked orders
+    pub fn get_all_tracked_orders(&self) -> Vec<TrackedOrder> {
+        self.order_tracker
+            .as_ref()
+            .map(|tracker| tracker.get_all_orders())
+            .unwrap_or_default()
+    }
+
+    /// Get orders by status
+    pub fn get_orders_by_status(&self, status: &OrderStatus) -> Vec<TrackedOrder> {
+        self.order_tracker
+            .as_ref()
+            .map(|tracker| tracker.get_orders_by_status(status))
+            .unwrap_or_default()
+    }
+
+    /// Get pending orders
+    pub fn get_pending_orders(&self) -> Vec<TrackedOrder> {
+        self.order_tracker
+            .as_ref()
+            .map(|tracker| tracker.get_pending_orders())
+            .unwrap_or_default()
+    }
+
+    /// Get submitted orders
+    pub fn get_submitted_orders(&self) -> Vec<TrackedOrder> {
+        self.order_tracker
+            .as_ref()
+            .map(|tracker| tracker.get_submitted_orders())
+            .unwrap_or_default()
+    }
+
+    /// Get failed orders
+    pub fn get_failed_orders(&self) -> Vec<TrackedOrder> {
+        self.order_tracker
+            .as_ref()
+            .map(|tracker| tracker.get_failed_orders())
+            .unwrap_or_default()
+    }
+
+    /// Clear tracked orders
+    pub fn clear_tracked_orders(&self) {
+        if let Some(tracker) = &self.order_tracker {
+            tracker.clear();
+        }
+    }
+
+    /// Get the number of tracked orders
+    pub fn tracked_order_count(&self) -> usize {
+        self.order_tracker
+            .as_ref()
+            .map(|tracker| tracker.len())
+            .unwrap_or(0)
     }
 
     // ==================== Constructors ====================
@@ -184,6 +254,7 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
             vault_address,
             agent,
             builder,
+            order_tracker: None,
         }
     }
 
@@ -195,8 +266,33 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
     ) -> Result<ExchangeResponseStatus> {
         self.rate_limiter.check_weight(WEIGHT_PLACE_ORDER)?;
 
+        // Auto-generate CLOID if tracking is enabled and order doesn't have one
+        let mut order = order.clone();
+        let cloid = if let Some(tracker) = &self.order_tracker {
+            let cloid = order.cloid
+                .as_ref()
+                .and_then(|c| Uuid::parse_str(c).ok())
+                .unwrap_or_else(Uuid::new_v4);
+            
+            // Ensure the order has a cloid
+            if order.cloid.is_none() {
+                order = order.with_cloid(Some(cloid));
+            }
+            
+            // Track the order
+            let timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            tracker.track_order(cloid, order.clone(), timestamp);
+            
+            Some(cloid)
+        } else {
+            order.cloid.as_ref().and_then(|c| Uuid::parse_str(c).ok())
+        };
+
         let bulk_order = BulkOrder {
-            orders: vec![order.clone()],
+            orders: vec![order],
             grouping: "na".to_string(),
             builder: self.builder.map(|addr| BuilderInfo {
                 builder: format!("0x{}", hex::encode(addr)),
@@ -204,7 +300,31 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
             }),
         };
 
-        self.send_l1_action("order", &bulk_order).await
+        let result = self.send_l1_action("order", &bulk_order).await;
+        
+        // Update tracking status based on result
+        if let Some(tracker) = &self.order_tracker {
+            if let Some(cloid) = cloid {
+                match &result {
+                    Ok(response) => {
+                        tracker.update_order_status(
+                            &cloid,
+                            OrderStatus::Submitted,
+                            Some(response.clone())
+                        );
+                    }
+                    Err(e) => {
+                        tracker.update_order_status(
+                            &cloid,
+                            OrderStatus::Failed(e.to_string()),
+                            None
+                        );
+                    }
+                }
+            }
+        }
+        
+        result
     }
 
     pub async fn place_order_with_builder_fee(
@@ -214,8 +334,33 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
     ) -> Result<ExchangeResponseStatus> {
         self.rate_limiter.check_weight(WEIGHT_PLACE_ORDER)?;
 
+        // Auto-generate CLOID if tracking is enabled and order doesn't have one
+        let mut order = order.clone();
+        let cloid = if let Some(tracker) = &self.order_tracker {
+            let cloid = order.cloid
+                .as_ref()
+                .and_then(|c| Uuid::parse_str(c).ok())
+                .unwrap_or_else(Uuid::new_v4);
+            
+            // Ensure the order has a cloid
+            if order.cloid.is_none() {
+                order = order.with_cloid(Some(cloid));
+            }
+            
+            // Track the order
+            let timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            tracker.track_order(cloid, order.clone(), timestamp);
+            
+            Some(cloid)
+        } else {
+            order.cloid.as_ref().and_then(|c| Uuid::parse_str(c).ok())
+        };
+
         let bulk_order = BulkOrder {
-            orders: vec![order.clone()],
+            orders: vec![order],
             grouping: "na".to_string(),
             builder: self.builder.map(|addr| BuilderInfo {
                 builder: format!("0x{}", hex::encode(addr)),
@@ -223,7 +368,31 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
             }),
         };
 
-        self.send_l1_action("order", &bulk_order).await
+        let result = self.send_l1_action("order", &bulk_order).await;
+        
+        // Update tracking status based on result
+        if let Some(tracker) = &self.order_tracker {
+            if let Some(cloid) = cloid {
+                match &result {
+                    Ok(response) => {
+                        tracker.update_order_status(
+                            &cloid,
+                            OrderStatus::Submitted,
+                            Some(response.clone())
+                        );
+                    }
+                    Err(e) => {
+                        tracker.update_order_status(
+                            &cloid,
+                            OrderStatus::Failed(e.to_string()),
+                            None
+                        );
+                    }
+                }
+            }
+        }
+        
+        result
     }
 
     pub async fn place_order_with_cloid(
@@ -232,6 +401,7 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
         cloid: Uuid,
     ) -> Result<ExchangeResponseStatus> {
         order = order.with_cloid(Some(cloid));
+        // place_order will handle tracking with the provided cloid
         self.place_order(&order).await
     }
 
@@ -504,7 +674,7 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
         let mut rng = rand::thread_rng();
         let mut key_bytes = [0u8; 32];
         rng.fill(&mut key_bytes);
-        let key_hex = hex::encode(&key_bytes);
+        let key_hex = hex::encode(key_bytes);
         
         // Create a signer from the key to get the address
         let signer = PrivateKeySigner::from_bytes(&B256::from(key_bytes))
@@ -761,7 +931,7 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
             "signature": {
                 "r": format!("0x{:064x}", signature.r),
                 "s": format!("0x{:064x}", signature.s),
-                "v": signature.v as u64,
+                "v": signature.v,
             },
             "nonce": nonce,
             "vaultAddress": self.vault_address,

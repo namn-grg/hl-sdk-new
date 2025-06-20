@@ -261,22 +261,17 @@ impl RawWsProvider {
         })?;
 
         tokio::spawn(async move {
-            loop {
-                match ws.read_frame().await {
-                    Ok(frame) => match frame.opcode {
-                        OpCode::Text => {
-                            if let Ok(text) = String::from_utf8(frame.payload.to_vec()) {
-                                let _ = message_tx.send(text);
-                            }
+            while let Ok(frame) = ws.read_frame().await {
+                match frame.opcode {
+                    OpCode::Text => {
+                        if let Ok(text) = String::from_utf8(frame.payload.to_vec()) {
+                            let _ = message_tx.send(text);
                         }
-                        OpCode::Close => {
-                            break;
-                        }
-                        _ => {}
-                    },
-                    Err(_) => {
+                    }
+                    OpCode::Close => {
                         break;
                     }
+                    _ => {}
                 }
             }
         });
@@ -533,7 +528,7 @@ impl ManagedWsProvider {
             
             let mut inner = self.inner.lock().await;
             if let Some(provider) = inner.as_mut() {
-                if let Err(_) = provider.ping().await {
+                if provider.ping().await.is_err() {
                     // Ping failed, connection might be dead
                     drop(inner);
                     self.handle_disconnect().await;

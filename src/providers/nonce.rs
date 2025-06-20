@@ -63,11 +63,15 @@ impl NonceManager {
     
     /// Get current counter value for monitoring
     pub fn get_counter(&self, address: Option<Address>) -> u64 {
-        if self.isolate_per_address && address.is_some() {
-            self.counters
-                .get(&address.unwrap())
-                .map(|c| c.load(Ordering::Relaxed))
-                .unwrap_or(0)
+        if let Some(addr) = address {
+            if self.isolate_per_address {
+                self.counters
+                    .get(&addr)
+                    .map(|c| c.load(Ordering::Relaxed))
+                    .unwrap_or(0)
+            } else {
+                self.global_counter.load(Ordering::Relaxed)
+            }
         } else {
             self.global_counter.load(Ordering::Relaxed)
         }
