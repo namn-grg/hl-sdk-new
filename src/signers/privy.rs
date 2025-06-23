@@ -147,12 +147,11 @@ impl HyperliquidSigner for PrivySigner {
         // Convert hash to hex string with 0x prefix
         let hash_hex = format!("0x{}", hex::encode(hash));
         
-        // Use personal_sign for hash signing
+        // Use secp256k1_sign for raw hash signing
         let body = json!({
-            "method": "personal_sign",
+            "method": "secp256k1_sign",
             "params": {
-                "message": hash_hex,
-                "encoding": "hex"
+                "hash": hash_hex
             }
         });
 

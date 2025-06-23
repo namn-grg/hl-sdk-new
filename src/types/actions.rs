@@ -4,48 +4,106 @@ use serde;
 use crate::types::requests::{
     BuilderInfo, CancelRequest, CancelRequestCloid, ModifyRequest, OrderRequest,
 };
-use crate::{hyperliquid_action, l1_action};
+use crate::l1_action;
 
 // User Actions (with HyperliquidTransaction: prefix)
 
-hyperliquid_action! {
-    /// USD transfer action
-    struct UsdSend {
-        pub signature_chain_id: u64,
-        pub hyperliquid_chain: String,
-        pub destination: String,
-        pub amount: String,
-        pub time: u64,
-    }
-    => "UsdSend(string hyperliquidChain,string destination,string amount,uint64 time)"
-    => encode(hyperliquid_chain, destination, amount, time)
+// UsdSend needs custom serialization for signature_chain_id
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsdSend {
+    #[serde(serialize_with = "serialize_chain_id")]
+    pub signature_chain_id: u64,
+    pub hyperliquid_chain: String,
+    pub destination: String,
+    pub amount: String,
+    pub time: u64,
 }
 
-hyperliquid_action! {
-    /// Withdraw from bridge action
-    struct Withdraw {
-        pub signature_chain_id: u64,
-        pub hyperliquid_chain: String,
-        pub destination: String,
-        pub amount: String,
-        pub time: u64,
+impl crate::types::eip712::HyperliquidAction for UsdSend {
+    const TYPE_STRING: &'static str = "UsdSend(string hyperliquidChain,string destination,string amount,uint64 time)";
+    const USE_PREFIX: bool = true;
+
+    fn chain_id(&self) -> Option<u64> {
+        Some(self.signature_chain_id)
     }
-    => "Withdraw(string hyperliquidChain,string destination,string amount,uint64 time)"
-    => encode(hyperliquid_chain, destination, amount, time)
+
+    fn encode_data(&self) -> Vec<u8> {
+        use crate::types::eip712::encode_value;
+        let mut encoded = Vec::new();
+        encoded.extend_from_slice(&Self::type_hash()[..]);
+        encoded.extend_from_slice(&encode_value(&self.hyperliquid_chain)[..]);
+        encoded.extend_from_slice(&encode_value(&self.destination)[..]);
+        encoded.extend_from_slice(&encode_value(&self.amount)[..]);
+        encoded.extend_from_slice(&encode_value(&self.time)[..]);
+        encoded
+    }
 }
 
-hyperliquid_action! {
-    /// Spot token transfer action
-    struct SpotSend {
-        pub signature_chain_id: u64,
-        pub hyperliquid_chain: String,
-        pub destination: String,
-        pub token: String,
-        pub amount: String,
-        pub time: u64,
+// Withdraw needs custom serialization for signature_chain_id
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Withdraw {
+    #[serde(serialize_with = "serialize_chain_id")]
+    pub signature_chain_id: u64,
+    pub hyperliquid_chain: String,
+    pub destination: String,
+    pub amount: String,
+    pub time: u64,
+}
+
+impl crate::types::eip712::HyperliquidAction for Withdraw {
+    const TYPE_STRING: &'static str = "Withdraw(string hyperliquidChain,string destination,string amount,uint64 time)";
+    const USE_PREFIX: bool = true;
+
+    fn chain_id(&self) -> Option<u64> {
+        Some(self.signature_chain_id)
     }
-    => "SpotSend(string hyperliquidChain,string destination,string token,string amount,uint64 time)"
-    => encode(hyperliquid_chain, destination, token, amount, time)
+
+    fn encode_data(&self) -> Vec<u8> {
+        use crate::types::eip712::encode_value;
+        let mut encoded = Vec::new();
+        encoded.extend_from_slice(&Self::type_hash()[..]);
+        encoded.extend_from_slice(&encode_value(&self.hyperliquid_chain)[..]);
+        encoded.extend_from_slice(&encode_value(&self.destination)[..]);
+        encoded.extend_from_slice(&encode_value(&self.amount)[..]);
+        encoded.extend_from_slice(&encode_value(&self.time)[..]);
+        encoded
+    }
+}
+
+// SpotSend needs custom serialization for signature_chain_id
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpotSend {
+    #[serde(serialize_with = "serialize_chain_id")]
+    pub signature_chain_id: u64,
+    pub hyperliquid_chain: String,
+    pub destination: String,
+    pub token: String,
+    pub amount: String,
+    pub time: u64,
+}
+
+impl crate::types::eip712::HyperliquidAction for SpotSend {
+    const TYPE_STRING: &'static str = "SpotSend(string hyperliquidChain,string destination,string token,string amount,uint64 time)";
+    const USE_PREFIX: bool = true;
+
+    fn chain_id(&self) -> Option<u64> {
+        Some(self.signature_chain_id)
+    }
+
+    fn encode_data(&self) -> Vec<u8> {
+        use crate::types::eip712::encode_value;
+        let mut encoded = Vec::new();
+        encoded.extend_from_slice(&Self::type_hash()[..]);
+        encoded.extend_from_slice(&encode_value(&self.hyperliquid_chain)[..]);
+        encoded.extend_from_slice(&encode_value(&self.destination)[..]);
+        encoded.extend_from_slice(&encode_value(&self.token)[..]);
+        encoded.extend_from_slice(&encode_value(&self.amount)[..]);
+        encoded.extend_from_slice(&encode_value(&self.time)[..]);
+        encoded
+    }
 }
 
 // ApproveAgent needs custom serialization for the address field
@@ -98,17 +156,36 @@ impl crate::types::eip712::HyperliquidAction for ApproveAgent {
     }
 }
 
-hyperliquid_action! {
-    /// Approve builder fee
-    struct ApproveBuilderFee {
-        pub signature_chain_id: u64,
-        pub hyperliquid_chain: String,
-        pub max_fee_rate: String,
-        pub builder: String,
-        pub nonce: u64,
+// ApproveBuilderFee needs custom serialization for signature_chain_id
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApproveBuilderFee {
+    #[serde(serialize_with = "serialize_chain_id")]
+    pub signature_chain_id: u64,
+    pub hyperliquid_chain: String,
+    pub max_fee_rate: String,
+    pub builder: String,
+    pub nonce: u64,
+}
+
+impl crate::types::eip712::HyperliquidAction for ApproveBuilderFee {
+    const TYPE_STRING: &'static str = "ApproveBuilderFee(string hyperliquidChain,string maxFeeRate,string builder,uint64 nonce)";
+    const USE_PREFIX: bool = true;
+
+    fn chain_id(&self) -> Option<u64> {
+        Some(self.signature_chain_id)
     }
-    => "ApproveBuilderFee(string hyperliquidChain,string maxFeeRate,string builder,uint64 nonce)"
-    => encode(hyperliquid_chain, max_fee_rate, builder, nonce)
+
+    fn encode_data(&self) -> Vec<u8> {
+        use crate::types::eip712::encode_value;
+        let mut encoded = Vec::new();
+        encoded.extend_from_slice(&Self::type_hash()[..]);
+        encoded.extend_from_slice(&encode_value(&self.hyperliquid_chain)[..]);
+        encoded.extend_from_slice(&encode_value(&self.max_fee_rate)[..]);
+        encoded.extend_from_slice(&encode_value(&self.builder)[..]);
+        encoded.extend_from_slice(&encode_value(&self.nonce)[..]);
+        encoded
+    }
 }
 
 // L1 Actions (use Exchange domain)
