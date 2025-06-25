@@ -35,16 +35,6 @@ macro_rules! define_spot_symbols {
     };
 }
 
-// Define Testnet Perpetual Symbols
-macro_rules! define_testnet_perp_symbols {
-    ($( ($const_name:ident, $index:expr) ),* $(,)?) => {
-        $(
-            #[doc = concat!(stringify!($const_name), " Perpetual (testnet, index: ", $index, ")")]
-            pub const $const_name: Symbol = Symbol::from_static(stringify!($const_name).trim_start_matches("TEST_"));
-        )*
-    };
-}
-
 // ==================== MAINNET ====================
 
 // ==================== MAINNET PERPETUALS ====================
@@ -437,18 +427,18 @@ define_spot_symbols!(
 
 // ==================== TESTNET PERPETUALS ====================
 
-define_testnet_perp_symbols!(
-    (TEST_API, 1),
-    (TEST_ARB, 13),
-    (TEST_ATOM, 2),
-    (TEST_AVAX, 7),
-    (TEST_BNB, 6),
-    (TEST_BTC, 3),
-    (TEST_ETH, 4),
-    (TEST_MATIC, 5),
-    (TEST_OP, 11),
-    (TEST_SOL, 0),
-    (TEST_SUI, 25),
+define_perp_symbols_literal!(
+    (TEST_API, 1, "API"),
+    (TEST_ARB, 13, "ARB"),
+    (TEST_ATOM, 2, "ATOM"),
+    (TEST_AVAX, 7, "AVAX"),
+    (TEST_BNB, 6, "BNB"),
+    (TEST_BTC, 3, "BTC"),
+    (TEST_ETH, 4, "ETH"),
+    (TEST_MATIC, 5, "MATIC"),
+    (TEST_OP, 11, "OP"),
+    (TEST_SOL, 0, "SOL"),
+    (TEST_SUI, 25, "SUI"),
 );
 
 // ==================== TESTNET SPOT PAIRS ====================
@@ -538,10 +528,11 @@ pub mod prelude {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_predefined_symbols() {
+        use super::*;
+
         assert_eq!(BTC.as_str(), "BTC");
         assert!(BTC.is_perp());
 
@@ -551,6 +542,8 @@ mod tests {
 
     #[test]
     fn test_runtime_symbol_creation() {
+        use super::*;
+
         let new_perp = symbol("NEWCOIN");
         assert_eq!(new_perp.as_str(), "NEWCOIN");
         assert!(new_perp.is_perp());
