@@ -40,6 +40,7 @@ macro_rules! define_spot_symbols {
 // ==================== MAINNET PERPETUALS ====================
 
 define_perp_symbols!(
+    (AAVE, 28),
     (ACE, 96),
     (ADA, 65),
     (AI, 115),
