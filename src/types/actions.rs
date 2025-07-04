@@ -128,7 +128,7 @@ pub(crate) fn serialize_address<S>(
 where
     S: serde::Serializer,
 {
-    serializer.serialize_str(&format!("{:#x}", address))
+    serializer.serialize_str(&format!("{address:#x}"))
 }
 
 pub(crate) fn serialize_chain_id<S>(
@@ -139,7 +139,7 @@ where
     S: serde::Serializer,
 {
     // Serialize as hex string to match SDK format
-    serializer.serialize_str(&format!("{:#x}", chain_id))
+    serializer.serialize_str(&format!("{chain_id:#x}"))
 }
 
 impl crate::types::eip712::HyperliquidAction for ApproveAgent {

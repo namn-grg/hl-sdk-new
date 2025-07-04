@@ -81,13 +81,13 @@ impl RawWsProvider {
 
         let uri = url
             .parse::<hyper::Uri>()
-            .map_err(|e| HyperliquidError::WebSocket(format!("Invalid URL: {}", e)))?;
+            .map_err(|e| HyperliquidError::WebSocket(format!("Invalid URL: {e}")))?;
 
         // Create HTTPS connector with proper configuration
         let https = HttpsConnectorBuilder::new()
             .with_native_roots()
             .map_err(|e| {
-                HyperliquidError::WebSocket(format!("Failed to load native roots: {}", e))
+                HyperliquidError::WebSocket(format!("Failed to load native roots: {e}"))
             })?
             .https_only()
             .enable_http1()
@@ -111,11 +111,11 @@ impl RawWsProvider {
             .header(header::SEC_WEBSOCKET_KEY, handshake::generate_key())
             .body(Empty::new())
             .map_err(|e| {
-                HyperliquidError::WebSocket(format!("Request build failed: {}", e))
+                HyperliquidError::WebSocket(format!("Request build failed: {e}"))
             })?;
 
         let res = client.request(req).await.map_err(|e| {
-            HyperliquidError::WebSocket(format!("HTTP request failed: {}", e))
+            HyperliquidError::WebSocket(format!("HTTP request failed: {e}"))
         })?;
 
         if res.status() != StatusCode::SWITCHING_PROTOCOLS {
@@ -127,7 +127,7 @@ impl RawWsProvider {
 
         let upgraded = hyper::upgrade::on(res)
             .await
-            .map_err(|e| HyperliquidError::WebSocket(format!("Upgrade failed: {}", e)))?;
+            .map_err(|e| HyperliquidError::WebSocket(format!("Upgrade failed: {e}")))?;
 
         Ok(WebSocket::after_handshake(
             TokioIo::new(upgraded),
@@ -184,7 +184,7 @@ impl RawWsProvider {
         ws.write_frame(Frame::text(payload.into_bytes().into()))
             .await
             .map_err(|e| {
-                HyperliquidError::WebSocket(format!("Failed to send subscription: {}", e))
+                HyperliquidError::WebSocket(format!("Failed to send subscription: {e}"))
             })?;
 
         // Create channel for this subscription
@@ -215,8 +215,7 @@ impl RawWsProvider {
                 .await
                 .map_err(|e| {
                     HyperliquidError::WebSocket(format!(
-                        "Failed to send unsubscribe: {}",
-                        e
+                        "Failed to send unsubscribe: {e}"
                     ))
                 })?;
         }
@@ -238,7 +237,7 @@ impl RawWsProvider {
         ws.write_frame(Frame::text(payload.into_bytes().into()))
             .await
             .map_err(|e| {
-                HyperliquidError::WebSocket(format!("Failed to send ping: {}", e))
+                HyperliquidError::WebSocket(format!("Failed to send ping: {e}"))
             })?;
 
         Ok(())
@@ -314,6 +313,7 @@ impl Drop for RawWsProvider {
 // ==================== Enhanced WebSocket Provider ====================
 
 use std::time::{Duration, Instant};
+
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 
@@ -559,7 +559,7 @@ impl ManagedWsProvider {
                 // Check max attempts
                 if let Some(max) = self.config.max_reconnect_attempts {
                     if reconnect_attempts >= max {
-                        eprintln!("Max reconnection attempts ({}) reached", max);
+                        eprintln!("Max reconnection attempts ({max}) reached");
                         break;
                     }
                 }
@@ -570,7 +570,7 @@ impl ManagedWsProvider {
                     Ok(mut new_provider) => {
                         // Start reading before replaying subscriptions
                         if let Err(e) = new_provider.start_reading().await {
-                            eprintln!("Failed to start reading after reconnect: {}", e);
+                            eprintln!("Failed to start reading after reconnect: {e}");
                             continue;
                         }
 
@@ -580,7 +580,7 @@ impl ManagedWsProvider {
                             if let Err(e) =
                                 new_provider.subscribe(entry.subscription.clone()).await
                             {
-                                eprintln!("Failed to replay subscription: {}", e);
+                                eprintln!("Failed to replay subscription: {e}");
                                 replay_errors += 1;
                             }
                         }
@@ -597,7 +597,7 @@ impl ManagedWsProvider {
                         }
                     }
                     Err(e) => {
-                        eprintln!("Reconnection failed: {}", e);
+                        eprintln!("Reconnection failed: {e}");
 
                         // Wait before next attempt
                         sleep(current_delay).await;

@@ -28,7 +28,7 @@ type Result<T> = std::result::Result<T, HyperliquidError>;
 /// Format a float for use in API requests
 /// Formats to 8 decimal places and removes trailing zeros
 fn format_float_string(value: f64) -> String {
-    let mut x = format!("{:.8}", value);
+    let mut x = format!("{value:.8}");
     while x.ends_with('0') {
         x.pop();
     }
@@ -585,7 +585,7 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
         let action = UsdSend {
             signature_chain_id: chain_id,
             hyperliquid_chain: chain.to_string(),
-            destination: format!("{:#x}", destination),
+            destination: format!("{destination:#x}"),
             amount: amount.to_string(),
             time: Self::current_nonce(),
         };
@@ -608,7 +608,7 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
         let action = Withdraw {
             signature_chain_id: chain_id,
             hyperliquid_chain: chain.to_string(),
-            destination: format!("{:#x}", destination),
+            destination: format!("{destination:#x}"),
             amount: amount.to_string(),
             time: Self::current_nonce(),
         };
@@ -633,7 +633,7 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
         let action = SpotSend {
             signature_chain_id: chain_id,
             hyperliquid_chain: chain.to_string(),
-            destination: format!("{:#x}", destination),
+            destination: format!("{destination:#x}"),
             token: symbol.as_str().to_string(),
             amount: amount.to_string(),
             time: Self::current_nonce(),
@@ -681,10 +681,7 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
         // Create a signer from the key to get the address
         let signer =
             PrivateKeySigner::from_bytes(&B256::from(key_bytes)).map_err(|e| {
-                HyperliquidError::InvalidRequest(format!(
-                    "Failed to create signer: {}",
-                    e
-                ))
+                HyperliquidError::InvalidRequest(format!("Failed to create signer: {e}"))
             })?;
         let agent_address = signer.address();
 
@@ -823,8 +820,7 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
             "withdraw3" => ActionWrapper::Withdraw3(action),
             _ => {
                 return Err(HyperliquidError::InvalidRequest(format!(
-                    "Unknown action type: {}",
-                    action_type
+                    "Unknown action type: {action_type}"
                 )))
             }
         };
@@ -832,7 +828,7 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
         // NOTE: Hyperliquid uses MessagePack (rmp_serde) for action serialization
         // This is different from typical EVM systems that use RLP
         let mut bytes = rmp_serde::to_vec_named(&wrapped).map_err(|e| {
-            HyperliquidError::InvalidRequest(format!("Failed to serialize action: {}", e))
+            HyperliquidError::InvalidRequest(format!("Failed to serialize action: {e}"))
         })?;
         bytes.extend(timestamp.to_be_bytes());
         if let Some(vault) = vault_address {
@@ -982,8 +978,7 @@ impl<S: HyperliquidSigner> RawExchangeProvider<S> {
                 }
             } else {
                 HyperliquidError::InvalidResponse(format!(
-                    "Failed to parse exchange response: {}",
-                    e
+                    "Failed to parse exchange response: {e}"
                 ))
             }
         })
@@ -1130,19 +1125,20 @@ impl<'a, S: HyperliquidSigner> OrderBuilder<'a, S> {
 }
 
 impl<S: HyperliquidSigner> RawExchangeProvider<S> {
-    pub fn order(&self, asset: u32) -> OrderBuilder<S> {
+    pub fn order(&self, asset: u32) -> OrderBuilder<'_, S> {
         OrderBuilder::new(self, asset)
     }
 }
 
 // ==================== Managed Exchange Provider ====================
 
+use tokio::sync::Mutex as TokioMutex;
+
 use crate::providers::{
     agent::{AgentConfig, AgentManager, AgentWallet},
     batcher::{BatchConfig, OrderBatcher, OrderHandle},
     nonce::NonceManager,
 };
-use tokio::sync::Mutex as TokioMutex;
 
 /// Configuration for managed exchange provider
 #[derive(Clone, Debug)]

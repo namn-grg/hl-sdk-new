@@ -1,9 +1,10 @@
 //! Nonce management for Hyperliquid's sliding window system
 
-use alloy::primitives::Address;
-use dashmap::DashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use alloy::primitives::Address;
+use dashmap::DashMap;
 
 /// Manages nonces for Hyperliquid's sliding window system
 ///
@@ -39,8 +40,7 @@ impl NonceManager {
             .as_millis() as u64;
 
         // Get counter increment
-        let counter = if self.isolate_per_address && address.is_some() {
-            let addr = address.unwrap();
+        let counter = if let (true, Some(addr)) = (self.isolate_per_address, address) {
             self.counters
                 .entry(addr)
                 .or_insert_with(|| AtomicU64::new(0))
